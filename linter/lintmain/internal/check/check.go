@@ -145,7 +145,6 @@ func (l *linter) checkFile(f *ast.File) {
 
 func (l *linter) initCheckers() error {
 	for _, c := range l.checkers {
-		fmt.Println(c.Name)
 		c.Init(l.ctx)
 	}
 	return nil
