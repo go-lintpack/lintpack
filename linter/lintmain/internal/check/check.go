@@ -185,6 +185,8 @@ func (l *linter) parseArgs() error {
 		`regexp that excludes checkers that have matching tag`)
 	disable := flag.String("disable", `<none>`,
 		`regexp that disables unwanted checks`)
+	enableTags := flag.String("enableTags", `.*`,
+		`regexp that includes checkers that have matching tag`)
 	enable := flag.String("enable", `.*`,
 		`regexp that selects what checkers are being run. Applied after all other filters`)
 	flag.IntVar(&l.exitCode, "exitCode", 1,
@@ -207,24 +209,34 @@ func (l *linter) parseArgs() error {
 	if err != nil {
 		return fmt.Errorf("-disable: %v", err)
 	}
+	enableTagsRE, err := regexp.Compile(*enableTags)
+	if err != nil {
+		return fmt.Errorf("-enableTags: %v", err)
+	}
 	enableRE, err := regexp.Compile(*enable)
 	if err != nil {
 		return fmt.Errorf("-enable: %v", err)
 	}
 
-	disabledByTags := func(c *lintpack.Checker) bool {
+	matchAnyTag := func(re *regexp.Regexp, c *lintpack.Checker) bool {
 		for _, tag := range c.Tags {
-			if disableTagsRE.MatchString(tag) {
+			if re.MatchString(tag) {
 				return true
 			}
 		}
 		return false
 	}
+	disabledByTags := func(c *lintpack.Checker) bool {
+		return matchAnyTag(disableTagsRE, c)
+	}
+	enabledByTags := func(c *lintpack.Checker) bool {
+		return matchAnyTag(enableTagsRE, c)
+	}
 	for _, c := range lintpack.Checkers {
 		if disabledByTags(c) || disableRE.MatchString(c.Name) {
 			continue
 		}
-		if enableRE.MatchString(c.Name) {
+		if enabledByTags(c) && enableRE.MatchString(c.Name) {
 			l.checkers = append(l.checkers, c)
 		}
 	}

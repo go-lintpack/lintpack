@@ -35,7 +35,7 @@ type abstractChecker interface {
 
 var checkerNameRE = regexp.MustCompile(`(\w+)Checker$`)
 
-func AddChecker(proto abstractChecker) {
+func AddChecker(proto abstractChecker, tags ...string) {
 	trimDocumentation := func(d *CheckerDoc) {
 		fields := []*string{
 			&d.Summary,
@@ -53,7 +53,7 @@ func AddChecker(proto abstractChecker) {
 		// TODO(quasilyte): validate documentation.
 	}
 
-	checker := &Checker{}
+	checker := &Checker{Tags: tags}
 	{
 		typeName := reflect.ValueOf(proto).Type().String()
 		m := checkerNameRE.FindStringSubmatch(typeName)
