@@ -181,7 +181,7 @@ func (l *linter) loadProgram() error {
 }
 
 func (l *linter) parseArgs() error {
-	disableTags := flag.String("disableTags", `^experimental$`,
+	disableTags := flag.String("disableTags", `^experimental$|^performance$`,
 		`regexp that excludes checkers that have matching tag`)
 	disable := flag.String("disable", `<none>`,
 		`regexp that disables unwanted checks`)
