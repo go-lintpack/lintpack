@@ -8,7 +8,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"strings"
 	"text/template"
 
 	"github.com/go-lintpack/lintpack/linter/lintmain"
@@ -52,8 +51,11 @@ type packer struct {
 }
 
 func (p *packer) parseArgs() error {
-	packages := flag.String("packages", "",
-		`comma-separated list of checkers providing packages`)
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "usage: lintpack [flags] packages...")
+		flag.PrintDefaults()
+	}
+
 	flag.StringVar(&p.Config.Version, "linterVersion", "0.0.1",
 		`value that will be printed by the linter "version" command`)
 	flag.StringVar(&p.outputFilename, "o", "linter",
@@ -61,10 +63,10 @@ func (p *packer) parseArgs() error {
 
 	flag.Parse()
 
-	p.Packages = strings.Split(*packages, ",")
+	p.Packages = flag.Args()
 
 	if len(p.Packages) == 0 {
-		return errors.New("-packages: expected non-empty list")
+		return errors.New("not enough arguments: expected non-empty package list")
 	}
 
 	return nil
