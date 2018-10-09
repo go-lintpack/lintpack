@@ -7,6 +7,10 @@ type stmtListWalker struct {
 }
 
 func (w *stmtListWalker) WalkFile(f *ast.File) {
+	if !w.visitor.EnterFile(f) {
+		return
+	}
+
 	for _, decl := range f.Decls {
 		decl, ok := decl.(*ast.FuncDecl)
 		if !ok || !w.visitor.EnterFunc(decl) {
@@ -21,7 +25,7 @@ func (w *stmtListWalker) WalkFile(f *ast.File) {
 			case *ast.CommClause:
 				w.visitor.VisitStmtList(x.Body)
 			}
-			return true
+			return !w.visitor.skipChilds()
 		})
 	}
 }

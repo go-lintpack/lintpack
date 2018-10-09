@@ -120,7 +120,7 @@ func (l *linter) checkFile(f *ast.File) {
 					return // There were no panic
 				}
 				if err, ok := r.(error); ok {
-					log.Printf("%s: error: %v\n", c.Name, err)
+					log.Printf("%s: error: %v\n", c.Info.Name, err)
 					panic(err)
 				} else {
 					// Some other kind of run-time panic.
@@ -136,7 +136,7 @@ func (l *linter) checkFile(f *ast.File) {
 					loc = shortenLocation(loc)
 				}
 
-				printWarning(l, c.Name, loc, warn.Text)
+				printWarning(l, c.Info.Name, loc, warn.Text)
 			}
 		}(c)
 	}
@@ -219,7 +219,7 @@ func (l *linter) parseArgs() error {
 	}
 
 	matchAnyTag := func(re *regexp.Regexp, c *lintpack.Checker) bool {
-		for _, tag := range c.Tags {
+		for _, tag := range c.Info.Tags {
 			if re.MatchString(tag) {
 				return true
 			}
@@ -227,16 +227,22 @@ func (l *linter) parseArgs() error {
 		return false
 	}
 	disabledByTags := func(c *lintpack.Checker) bool {
+		if len(c.Info.Tags) == 0 {
+			return false
+		}
 		return matchAnyTag(disableTagsRE, c)
 	}
 	enabledByTags := func(c *lintpack.Checker) bool {
+		if len(c.Info.Tags) == 0 {
+			return true
+		}
 		return matchAnyTag(enableTagsRE, c)
 	}
 	for _, c := range lintpack.Checkers {
-		if disabledByTags(c) || disableRE.MatchString(c.Name) {
+		if disabledByTags(c) || disableRE.MatchString(c.Info.Name) {
 			continue
 		}
-		if enabledByTags(c) && enableRE.MatchString(c.Name) {
+		if enabledByTags(c) && enableRE.MatchString(c.Info.Name) {
 			l.checkers = append(l.checkers, c)
 		}
 	}

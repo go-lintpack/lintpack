@@ -1,57 +1,47 @@
 package astwalk
 
 import (
-	"go/ast"
 	"go/types"
+
+	"github.com/go-lintpack/lintpack"
 )
 
-// FileWalker traverses given file and calls associated visitor
-// for every node it's interested in.
-type FileWalker interface {
-	WalkFile(*ast.File)
-}
-
-// WalkerForFile returns file walker implementation for FileVisitor.
-func WalkerForFile(v FileVisitor) FileWalker {
-	return &fileWalker{visitor: v}
-}
-
 // WalkerForFuncDecl returns file walker implementation for FuncDeclVisitor.
-func WalkerForFuncDecl(v FuncDeclVisitor) FileWalker {
+func WalkerForFuncDecl(v FuncDeclVisitor) lintpack.FileWalker {
 	return &funcDeclWalker{visitor: v}
 }
 
 // WalkerForExpr returns file walker implementation for ExprVisitor.
-func WalkerForExpr(v ExprVisitor) FileWalker {
+func WalkerForExpr(v ExprVisitor) lintpack.FileWalker {
 	return &exprWalker{visitor: v}
 }
 
 // WalkerForLocalExpr returns file walker implementation for LocalExprVisitor.
-func WalkerForLocalExpr(v LocalExprVisitor) FileWalker {
+func WalkerForLocalExpr(v LocalExprVisitor) lintpack.FileWalker {
 	return &localExprWalker{visitor: v}
 }
 
 // WalkerForStmtList returns file walker implementation for StmtListVisitor.
-func WalkerForStmtList(v StmtListVisitor) FileWalker {
+func WalkerForStmtList(v StmtListVisitor) lintpack.FileWalker {
 	return &stmtListWalker{visitor: v}
 }
 
 // WalkerForStmt returns file walker implementation for StmtVisitor.
-func WalkerForStmt(v StmtVisitor) FileWalker {
+func WalkerForStmt(v StmtVisitor) lintpack.FileWalker {
 	return &stmtWalker{visitor: v}
 }
 
 // WalkerForTypeExpr returns file walker implementation for TypeExprVisitor.
-func WalkerForTypeExpr(v TypeExprVisitor, info *types.Info) FileWalker {
+func WalkerForTypeExpr(v TypeExprVisitor, info *types.Info) lintpack.FileWalker {
 	return &typeExprWalker{visitor: v, info: info}
 }
 
 // WalkerForLocalComment returns file walker implementation for LocalCommentVisitor.
-func WalkerForLocalComment(v LocalCommentVisitor) FileWalker {
+func WalkerForLocalComment(v LocalCommentVisitor) lintpack.FileWalker {
 	return &localCommentWalker{visitor: v}
 }
 
 // WalkerForDocComment returns file walker implementation for DocCommentVisitor.
-func WalkerForDocComment(v DocCommentVisitor) FileWalker {
+func WalkerForDocComment(v DocCommentVisitor) lintpack.FileWalker {
 	return &docCommentWalker{visitor: v}
 }

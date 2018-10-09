@@ -7,6 +7,10 @@ type localCommentWalker struct {
 }
 
 func (w *localCommentWalker) WalkFile(f *ast.File) {
+	if !w.visitor.EnterFile(f) {
+		return
+	}
+
 	for _, decl := range f.Decls {
 		decl, ok := decl.(*ast.FuncDecl)
 		if !ok || !w.visitor.EnterFunc(decl) {

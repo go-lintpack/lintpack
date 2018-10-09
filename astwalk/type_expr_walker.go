@@ -15,6 +15,10 @@ type typeExprWalker struct {
 }
 
 func (w *typeExprWalker) WalkFile(f *ast.File) {
+	if !w.visitor.EnterFile(f) {
+		return
+	}
+
 	for _, decl := range f.Decls {
 		if decl, ok := decl.(*ast.FuncDecl); ok {
 			if !w.visitor.EnterFunc(decl) {
@@ -39,8 +43,7 @@ func (w *typeExprWalker) WalkFile(f *ast.File) {
 
 func (w *typeExprWalker) visit(x ast.Expr) bool {
 	w.visitor.VisitTypeExpr(x)
-	// return w.visitor.EnterChilds(x)
-	return true
+	return !w.visitor.skipChilds()
 }
 
 func (w *typeExprWalker) walk(x ast.Node) bool {

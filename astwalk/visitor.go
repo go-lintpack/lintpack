@@ -6,9 +6,11 @@ import (
 
 // Visitor interfaces.
 type (
-	// FileVisitor visits every package file.
-	FileVisitor interface {
-		VisitFile(*ast.File)
+	// DocCommentVisitor visits every doc-comment.
+	// Does not visit doc-comments for function-local definitions (types, etc).
+	// Also does not visit package doc-comment (file-level doc-comments).
+	DocCommentVisitor interface {
+		VisitDocComment(*ast.CommentGroup)
 	}
 
 	// FuncDeclVisitor visits every top-level function declaration.
@@ -56,19 +58,17 @@ type (
 		walkerEvents
 		VisitLocalComment(*ast.CommentGroup)
 	}
-
-	// DocCommentVisitor visits every doc-comment.
-	// Does not visit doc-comments for function-local definitions (types, etc).
-	// Also does not visit package doc-comment (file-level doc-comments).
-	DocCommentVisitor interface {
-		walkerEvents
-		VisitDocComment(*ast.CommentGroup)
-	}
 )
 
 // walkerEvents describes common hooks available for most visitor types.
 type walkerEvents interface {
+	// EnterFile is called for every file that is about to be traversed.
+	// If false is returned, file is not visited.
+	EnterFile(*ast.File) bool
+
 	// EnterFunc is called for every function declaration that is about
 	// to be traversed. If false is returned, function is not visited.
 	EnterFunc(*ast.FuncDecl) bool
+
+	skipChilds() bool
 }

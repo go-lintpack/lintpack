@@ -4,8 +4,15 @@ import (
 	"go/ast"
 )
 
-// CheckerDoc holds checker structured documentation.
-type CheckerDoc struct {
+// CheckerInfo holds checker metadata and structured documentation.
+type CheckerInfo struct {
+	// Name is a checker name.
+	Name string
+
+	// Tags is a list of labels that can be used to enable or disable checker.
+	// Common tags are "experimental" and "performance".
+	Tags []string
+
 	// Summary is a short one sentence description.
 	// Should not end with a period.
 	Summary string
