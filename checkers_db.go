@@ -40,13 +40,13 @@ func AddChecker(info *CheckerInfo, constructor func(*CheckerContext) FileWalker)
 	checker := &Checker{
 		Info: info,
 	}
+	trimDocumentation(checker.Info)
+	validateDocumentation(checker.Info)
 	checker.Init = func(ctx *Context) {
 		checker.ctx = CheckerContext{
 			Context: ctx,
 			printer: astfmt.NewPrinter(ctx.FileSet),
 		}
-		trimDocumentation(checker.Info)
-		validateDocumentation(checker.Info)
 		checker.fileWalker = constructor(&checker.ctx)
 	}
 
