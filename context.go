@@ -8,6 +8,7 @@ import (
 	"github.com/go-toolsmith/astfmt"
 )
 
+// Context is a readonly state shared among every checker.
 type Context struct {
 	// TypesInfo carries parsed packages types information.
 	TypesInfo *types.Info
@@ -26,6 +27,8 @@ type Context struct {
 	Filename string
 }
 
+// CheckerContext is checker-local context copy.
+// Fields that are not from Context itself are writeable.
 type CheckerContext struct {
 	*Context
 
