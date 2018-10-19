@@ -5,7 +5,6 @@ import (
 	"go/parser"
 	"go/types"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -14,11 +13,7 @@ import (
 	"golang.org/x/tools/go/loader"
 )
 
-var (
-	sizes              = types.SizesFor("gc", runtime.GOARCH)
-	warningDirectiveRE = regexp.MustCompile(`^\s*/// (.*)`)
-	commentRE          = regexp.MustCompile(`^\s*//`)
-)
+var sizes = types.SizesFor("gc", runtime.GOARCH)
 
 // TestCheckers runs end2end tests over all registered checkers using default options.
 //

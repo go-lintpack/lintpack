@@ -2,8 +2,14 @@ package linttest
 
 import (
 	"io/ioutil"
+	"regexp"
 	"strings"
 	"testing"
+)
+
+var (
+	warningDirectiveRE = regexp.MustCompile(`^\s*/// (.*)`)
+	commentRE          = regexp.MustCompile(`^\s*//`)
 )
 
 type goldenFile struct {
