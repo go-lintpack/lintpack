@@ -40,6 +40,7 @@ func saneCheckersList(t *testing.T) []*lintpack.CheckerInfo {
 				}
 			}()
 			for _, f := range pkgInfo.Files {
+				ctx.SetFileInfo(getFilename(prog, f), f)
 				_ = c.Check(f)
 			}
 		})
@@ -81,7 +82,7 @@ func checkFiles(t *testing.T, c *lintpack.Checker, ctx *lintpack.Context, prog *
 		goldenWarns := newGoldenFile(t, testFilename)
 
 		stripDirectives(f)
-		ctx.Filename = filename
+		ctx.SetFileInfo(filename, f)
 
 		for _, warn := range c.Check(f) {
 			line := ctx.FileSet.Position(warn.Node.Pos()).Line
