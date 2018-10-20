@@ -20,13 +20,12 @@ var sizes = types.SizesFor("gc", runtime.GOARCH)
 // TODO(Quasilyte): document default options.
 // TODO(Quasilyte): make it possible to run tests with different options.
 func TestCheckers(t *testing.T) {
-	for _, c := range lintpack.Checkers {
-		t.Run(c.Info.Name, func(t *testing.T) {
-			checker := c
+	for _, info := range lintpack.GetCheckersInfo() {
+		t.Run(info.Name, func(t *testing.T) {
 			if testing.CoverMode() == "" {
 				t.Parallel()
 			}
-			pkgPath := "./testdata/" + checker.Info.Name
+			pkgPath := "./testdata/" + info.Name
 
 			prog := newProg(t, pkgPath)
 			pkgInfo := prog.Imported[pkgPath]
@@ -38,6 +37,7 @@ func TestCheckers(t *testing.T) {
 			ctx.TypesInfo = &pkgInfo.Info
 			ctx.Pkg = pkgInfo.Pkg
 
+			checker := lintpack.NewChecker(ctx, info)
 			checkFiles(t, checker, ctx, prog, pkgPath)
 		})
 	}
@@ -51,7 +51,6 @@ func checkFiles(t *testing.T, c *lintpack.Checker, ctx *lintpack.Context, prog *
 		testFilename := filepath.Join("testdata", c.Info.Name, filename)
 		goldenWarns := newGoldenFile(t, testFilename)
 
-		c.Init(ctx)
 		stripDirectives(f)
 		ctx.Filename = filename
 

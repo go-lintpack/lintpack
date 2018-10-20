@@ -1,6 +1,7 @@
 package check
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"go/ast"
@@ -53,11 +54,19 @@ type linter struct {
 
 	foundIssues bool
 
+	filters struct {
+		disableTags *regexp.Regexp
+		disable     *regexp.Regexp
+		enableTags  *regexp.Regexp
+		enable      *regexp.Regexp
+	}
+
 	exitCode           int
 	checkTests         bool
 	checkGenerated     bool
 	shorterErrLocation bool
 	coloredOutput      bool
+	verbose            bool
 }
 
 func (l *linter) exit() error {
@@ -144,8 +153,56 @@ func (l *linter) checkFile(f *ast.File) {
 }
 
 func (l *linter) initCheckers() error {
-	for _, c := range l.checkers {
-		c.Init(l.ctx)
+	matchAnyTag := func(re *regexp.Regexp, info *lintpack.CheckerInfo) bool {
+		for _, tag := range info.Tags {
+			if re.MatchString(tag) {
+				return true
+			}
+		}
+		return false
+	}
+	disabledByTags := func(info *lintpack.CheckerInfo) bool {
+		if len(info.Tags) == 0 {
+			return false
+		}
+		return matchAnyTag(l.filters.disableTags, info)
+	}
+	enabledByTags := func(info *lintpack.CheckerInfo) bool {
+		if len(info.Tags) == 0 {
+			return true
+		}
+		return matchAnyTag(l.filters.enableTags, info)
+	}
+
+	for _, info := range lintpack.GetCheckersInfo() {
+		enabled := false
+		notice := ""
+
+		switch {
+		case disabledByTags(info):
+			notice = "disabled by tags (-disableTags)"
+		case l.filters.disable.MatchString(info.Name):
+			notice = "disabled by name (-disable)"
+		case enabledByTags(info):
+			enabled = true
+			notice = "enabled by tags (-enableTags)"
+		case l.filters.enable.MatchString(info.Name):
+			enabled = true
+			notice = "enabled by name (-enable)"
+		default:
+			notice = "was not enabled"
+		}
+
+		if l.verbose {
+			log.Printf("\tdebug: %s: %s", info.Name, notice)
+		}
+		if enabled {
+			l.checkers = append(l.checkers, lintpack.NewChecker(l.ctx, info))
+		}
+	}
+
+	if len(l.checkers) == 0 {
+		return errors.New("empty checkers set selected")
 	}
 	return nil
 }
@@ -197,54 +254,29 @@ func (l *linter) parseArgs() error {
 		`whether to replace error location prefix with $GOROOT and $GOPATH`)
 	flag.BoolVar(&l.coloredOutput, `coloredOutput`, true,
 		`whether to use colored output`)
+	flag.BoolVar(&l.verbose, `verbose`, false,
+		`whether to print output useful during linter debugging`)
 
 	flag.Parse()
 
+	var err error
+
 	l.packages = flag.Args()
-	disableTagsRE, err := regexp.Compile(*disableTags)
+	l.filters.disableTags, err = regexp.Compile(*disableTags)
 	if err != nil {
 		return fmt.Errorf("-disableTags: %v", err)
 	}
-	disableRE, err := regexp.Compile(*disable)
+	l.filters.disable, err = regexp.Compile(*disable)
 	if err != nil {
 		return fmt.Errorf("-disable: %v", err)
 	}
-	enableTagsRE, err := regexp.Compile(*enableTags)
+	l.filters.enableTags, err = regexp.Compile(*enableTags)
 	if err != nil {
 		return fmt.Errorf("-enableTags: %v", err)
 	}
-	enableRE, err := regexp.Compile(*enable)
+	l.filters.enable, err = regexp.Compile(*enable)
 	if err != nil {
 		return fmt.Errorf("-enable: %v", err)
-	}
-
-	matchAnyTag := func(re *regexp.Regexp, c *lintpack.Checker) bool {
-		for _, tag := range c.Info.Tags {
-			if re.MatchString(tag) {
-				return true
-			}
-		}
-		return false
-	}
-	disabledByTags := func(c *lintpack.Checker) bool {
-		if len(c.Info.Tags) == 0 {
-			return false
-		}
-		return matchAnyTag(disableTagsRE, c)
-	}
-	enabledByTags := func(c *lintpack.Checker) bool {
-		if len(c.Info.Tags) == 0 {
-			return true
-		}
-		return matchAnyTag(enableTagsRE, c)
-	}
-	for _, c := range lintpack.Checkers {
-		if disabledByTags(c) || disableRE.MatchString(c.Info.Name) {
-			continue
-		}
-		if enabledByTags(c) && enableRE.MatchString(c.Info.Name) {
-			l.checkers = append(l.checkers, c)
-		}
 	}
 
 	return nil

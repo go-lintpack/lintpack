@@ -4,6 +4,11 @@ import (
 	"go/ast"
 )
 
+type checkerProto struct {
+	info        *CheckerInfo
+	constructor func(ctx *Context) *Checker
+}
+
 type Checker struct {
 	Info *CheckerInfo
 

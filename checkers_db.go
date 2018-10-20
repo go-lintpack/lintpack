@@ -1,18 +1,46 @@
 package lintpack
 
 import (
+	"fmt"
 	"go/ast"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/go-toolsmith/astfmt"
 )
 
-// Checkers is a list of registered checkers.
+// prototypes is a set of registered checkers that are not yet instantiated.
 // Registration should be done with AddChecker function.
+// Initialized checkers can be obtained with NewChecker function.
+var prototypes = make(map[string]checkerProto)
+
+// GetCheckersInfo returns a checkers info list for all registered checkers.
+// The slice is sorted by a checker name.
 //
-// TODO(quasilyte): can this be done without exported global var?
-var Checkers []*Checker
+// Info objects can be used to instantiate checkers with NewChecker function.
+func GetCheckersInfo() []*CheckerInfo {
+	infoList := make([]*CheckerInfo, 0, len(prototypes))
+	for _, proto := range prototypes {
+		infoCopy := *proto.info
+		infoList = append(infoList, &infoCopy)
+	}
+	sort.Slice(infoList, func(i, j int) bool {
+		return infoList[i].Name < infoList[j].Name
+	})
+	return infoList
+}
+
+// NewChecker returns initialized checker identified by an info.
+// info must be non-nil.
+// Panics if info describes a checker that was not properly registered.
+func NewChecker(ctx *Context, info *CheckerInfo) *Checker {
+	proto, ok := prototypes[info.Name]
+	if !ok {
+		panic(fmt.Sprintf("checker with name %q not registered", info.Name))
+	}
+	return proto.constructor(ctx)
+}
 
 // FileWalker is an interface every checker should implement.
 //
@@ -24,12 +52,17 @@ type FileWalker interface {
 
 var checkerNameRE = regexp.MustCompile(`(\w+)Checker$`)
 
-// AddChecker registers a new checker into a checker pool.
-// constructor is used to create a new checker instance.
+// AddChecker registers a new checker into a checkers pool.
+// Constructor is used to create a new checker instance.
+// Checker name (defined in CheckerInfo.Name) must be unique.
 //
 // If checker is never needed, for example if it is disabled,
 // constructor will not be called.
 func AddChecker(info *CheckerInfo, constructor func(*CheckerContext) FileWalker) {
+	if _, ok := prototypes[info.Name]; ok {
+		panic(fmt.Sprintf("checker with name %q already registered", info.Name))
+	}
+
 	trimDocumentation := func(d *CheckerInfo) {
 		fields := []*string{
 			&d.Summary,
@@ -43,21 +76,25 @@ func AddChecker(info *CheckerInfo, constructor func(*CheckerContext) FileWalker)
 		}
 	}
 	validateDocumentation := func(d *CheckerInfo) {
-		// TODO(quasilyte): validate documentation.
+		// TODO(Quasilyte): validate documentation.
 	}
 
-	checker := &Checker{
-		Info: info,
-	}
-	trimDocumentation(checker.Info)
-	validateDocumentation(checker.Info)
-	checker.Init = func(ctx *Context) {
-		checker.ctx = CheckerContext{
-			Context: ctx,
-			printer: astfmt.NewPrinter(ctx.FileSet),
-		}
-		checker.fileWalker = constructor(&checker.ctx)
+	trimDocumentation(info)
+	validateDocumentation(info)
+
+	proto := checkerProto{
+		info: info,
+		constructor: func(ctx *Context) *Checker {
+			var c Checker
+			c.Info = info
+			c.ctx = CheckerContext{
+				Context: ctx,
+				printer: astfmt.NewPrinter(ctx.FileSet),
+			}
+			c.fileWalker = constructor(&c.ctx)
+			return &c
+		},
 	}
 
-	Checkers = append(Checkers, checker)
+	prototypes[info.Name] = proto
 }
