@@ -6,6 +6,7 @@ import (
 	"go/types"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"testing"
 
@@ -15,30 +16,64 @@ import (
 
 var sizes = types.SizesFor("gc", runtime.GOARCH)
 
+type checkersList struct {
+	checkers []*lintpack.Checker
+	ctx      *lintpack.Context
+}
+
+func saneCheckersList(t *testing.T) checkersList {
+	var checkers []*lintpack.Checker
+
+	ctx := &lintpack.Context{
+		SizesInfo: sizes,
+	}
+
+	for _, info := range lintpack.GetCheckersInfo() {
+		pkgPath := "github.com/go-lintpack/lintpack/linttest/testdata/sanity"
+		t.Run("sanity/"+info.Name, func(t *testing.T) {
+			prog := newProg(t, pkgPath)
+			pkgInfo := prog.Imported[pkgPath]
+			ctx.FileSet = prog.Fset
+			ctx.TypesInfo = &pkgInfo.Info
+			ctx.Pkg = pkgInfo.Pkg
+
+			c := lintpack.NewChecker(ctx, info)
+			defer func() {
+				r := recover()
+				if r != nil {
+					t.Errorf("unexpected panic: %v\n%s", r, debug.Stack())
+				} else {
+					checkers = append(checkers, c)
+				}
+			}()
+			for _, f := range pkgInfo.Files {
+				_ = c.Check(f)
+			}
+		})
+	}
+
+	return checkersList{ctx: ctx, checkers: checkers}
+}
+
 // TestCheckers runs end2end tests over all registered checkers using default options.
 //
 // TODO(Quasilyte): document default options.
 // TODO(Quasilyte): make it possible to run tests with different options.
 func TestCheckers(t *testing.T) {
-	for _, info := range lintpack.GetCheckersInfo() {
-		t.Run(info.Name, func(t *testing.T) {
-			if testing.CoverMode() == "" {
-				t.Parallel()
-			}
-			pkgPath := "./testdata/" + info.Name
+	list := saneCheckersList(t)
+	ctx := list.ctx
+	for _, c := range list.checkers {
+		t.Run(c.Info.Name, func(t *testing.T) {
+			pkgPath := "./testdata/" + c.Info.Name
 
 			prog := newProg(t, pkgPath)
 			pkgInfo := prog.Imported[pkgPath]
 
-			ctx := &lintpack.Context{
-				SizesInfo: sizes,
-				FileSet:   prog.Fset,
-			}
+			ctx.FileSet = prog.Fset
 			ctx.TypesInfo = &pkgInfo.Info
 			ctx.Pkg = pkgInfo.Pkg
 
-			checker := lintpack.NewChecker(ctx, info)
-			checkFiles(t, checker, ctx, prog, pkgPath)
+			checkFiles(t, c, ctx, prog, pkgPath)
 		})
 	}
 }
