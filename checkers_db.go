@@ -3,7 +3,6 @@ package lintpack
 import (
 	"fmt"
 	"go/ast"
-	"regexp"
 	"sort"
 	"strings"
 
@@ -49,8 +48,6 @@ func NewChecker(ctx *Context, info *CheckerInfo) *Checker {
 type FileWalker interface {
 	WalkFile(*ast.File)
 }
-
-var checkerNameRE = regexp.MustCompile(`(\w+)Checker$`)
 
 // AddChecker registers a new checker into a checkers pool.
 // Constructor is used to create a new checker instance.
