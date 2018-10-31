@@ -11,13 +11,13 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"plugin"
 	"regexp"
 	"runtime"
 	"strings"
 	"sync"
 
 	"github.com/go-lintpack/lintpack"
+	"github.com/go-lintpack/lintpack/linter/lintmain/internal/hotload"
 	"github.com/logrusorgru/aurora"
 	"golang.org/x/tools/go/loader"
 )
@@ -238,20 +238,7 @@ func (l *linter) loadProgram() error {
 }
 
 func (l *linter) loadPlugin() error {
-	if l.pluginPath == "" {
-		return nil // Nothing to do
-	}
-	checkersBefore := len(lintpack.GetCheckersInfo())
-	// Open plugin only for side-effects (init functions).
-	_, err := plugin.Open(l.pluginPath)
-	if err != nil {
-		return err
-	}
-	checkersAfter := len(lintpack.GetCheckersInfo())
-	if checkersBefore == checkersAfter {
-		return fmt.Errorf("loaded plugin doesn't provide any lintpack-compatible checkers")
-	}
-	return nil
+	return hotload.CheckersFromDylib(l.pluginPath)
 }
 
 func (l *linter) parseArgs() error {
