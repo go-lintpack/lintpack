@@ -47,6 +47,31 @@ type Context struct {
 	PkgRenames map[string]string
 }
 
+// NewContext returns new shared context to be used by every checker.
+//
+// All data carried by the context is readonly for checkers,
+// but can be modified by the integrating application.
+func NewContext(fset *token.FileSet, sizes types.Sizes) *Context {
+	return &Context{
+		FileSet:   fset,
+		SizesInfo: sizes,
+		TypesInfo: &types.Info{},
+	}
+}
+
+// SetPackageInfo sets package-related metadata.
+//
+// Must be called for every package being checked.
+func (c *Context) SetPackageInfo(info *types.Info, pkg *types.Package) {
+	if info != nil {
+		// We do this kind of assignment to avoid
+		// changing c.typesInfo field address after
+		// every re-assignment.
+		*c.TypesInfo = *info
+	}
+	c.Pkg = pkg
+}
+
 // SetFileInfo sets file-related metadata.
 //
 // Must be called for every source code file being checked.

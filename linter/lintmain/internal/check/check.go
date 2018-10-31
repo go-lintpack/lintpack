@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"plugin"
 	"regexp"
 	"runtime"
 	"strings"
@@ -31,6 +32,7 @@ func Main() {
 	}{
 		{"parse args", l.parseArgs},
 		{"load program", l.loadProgram},
+		{"load plugin", l.loadPlugin},
 		{"init checkers", l.initCheckers},
 		{"run checkers", l.runCheckers},
 		{"exit if found issues", l.exit},
@@ -60,6 +62,8 @@ type linter struct {
 		enableTags  *regexp.Regexp
 		enable      *regexp.Regexp
 	}
+
+	pluginPath string
 
 	exitCode           int
 	checkTests         bool
@@ -99,8 +103,7 @@ func (l *linter) runCheckers() error {
 }
 
 func (l *linter) checkPackage(pkgPath string, pkgInfo *loader.PackageInfo) {
-	l.ctx.TypesInfo = &pkgInfo.Info
-	l.ctx.Pkg = pkgInfo.Pkg
+	l.ctx.SetPackageInfo(&pkgInfo.Info, pkgInfo.Pkg)
 	for _, f := range pkgInfo.Files {
 		filename := l.getFilename(f)
 		if !l.checkTests && strings.HasSuffix(filename, "_test.go") {
@@ -109,7 +112,7 @@ func (l *linter) checkPackage(pkgPath string, pkgInfo *loader.PackageInfo) {
 		if !l.checkGenerated && l.isGenerated(f) {
 			continue
 		}
-		l.ctx.Filename = filename
+		l.ctx.SetFileInfo(filename, f)
 		l.checkFile(f)
 	}
 }
@@ -229,15 +232,31 @@ func (l *linter) loadProgram() error {
 	}
 
 	l.prog = prog
-	l.ctx = &lintpack.Context{
-		SizesInfo: sizes,
-		FileSet:   prog.Fset,
-	}
+	l.ctx = lintpack.NewContext(prog.Fset, sizes)
 
 	return nil
 }
 
+func (l *linter) loadPlugin() error {
+	if l.pluginPath == "" {
+		return nil // Nothing to do
+	}
+	checkersBefore := len(lintpack.GetCheckersInfo())
+	// Open plugin only for side-effects (init functions).
+	_, err := plugin.Open(l.pluginPath)
+	if err != nil {
+		return err
+	}
+	checkersAfter := len(lintpack.GetCheckersInfo())
+	if checkersBefore == checkersAfter {
+		return fmt.Errorf("loaded plugin doesn't provide any lintpack-compatible checkers")
+	}
+	return nil
+}
+
 func (l *linter) parseArgs() error {
+	flag.StringVar(&l.pluginPath, "pluginPath", "",
+		`path to a Go plugin that provides additional checks`)
 	disableTags := flag.String("disableTags", `^experimental$|^performance$|^opinionated$`,
 		`regexp that excludes checkers that have matching tag`)
 	disable := flag.String("disable", `<none>`,
