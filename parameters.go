@@ -2,12 +2,14 @@ package lintpack
 
 import (
 	"log"
+	"strings"
 )
 
 type parameters map[string]interface{}
 
 func (p parameters) Int(key string, defaultValue int) int {
-	if value, ok := p[key]; ok {
+	k := strings.ToLower(key)
+	if value, ok := p[k]; ok {
 		if value, ok := value.(int); ok {
 			return value
 		}
@@ -17,7 +19,8 @@ func (p parameters) Int(key string, defaultValue int) int {
 }
 
 func (p parameters) String(key, defaultValue string) string {
-	if value, ok := p[key]; ok {
+	k := strings.ToLower(key)
+	if value, ok := p[k]; ok {
 		if value, ok := value.(string); ok {
 			return value
 		}
@@ -27,7 +30,8 @@ func (p parameters) String(key, defaultValue string) string {
 }
 
 func (p parameters) Bool(key string, defaultValue bool) bool {
-	if value, ok := p[key]; ok {
+	k := strings.ToLower(key)
+	if value, ok := p[k]; ok {
 		if value, ok := value.(bool); ok {
 			return value
 		}
