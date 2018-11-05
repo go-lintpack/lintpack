@@ -6,7 +6,7 @@ import (
 
 type checkerProto struct {
 	info        *CheckerInfo
-	constructor func(ctx *Context) *Checker
+	constructor func(*Context, parameters) *Checker
 }
 
 type Checker struct {

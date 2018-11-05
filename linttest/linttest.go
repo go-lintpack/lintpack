@@ -30,7 +30,8 @@ func saneCheckersList(t *testing.T) []*lintpack.CheckerInfo {
 				TypesInfo: &pkgInfo.Info,
 				Pkg:       pkgInfo.Pkg,
 			}
-			c := lintpack.NewChecker(ctx, info)
+			// TODO(Quasilyte): make it possible to use non-nil params here. See #6.
+			c := lintpack.NewChecker(ctx, info, nil)
 			defer func() {
 				r := recover()
 				if r != nil {
@@ -66,7 +67,8 @@ func TestCheckers(t *testing.T) {
 				TypesInfo: &pkgInfo.Info,
 				Pkg:       pkgInfo.Pkg,
 			}
-			c := lintpack.NewChecker(ctx, info)
+			// TODO(Quasilyte): make it possible to use non-nil params here. See #6.
+			c := lintpack.NewChecker(ctx, info, nil)
 
 			checkFiles(t, c, ctx, prog, pkgPath)
 		})
