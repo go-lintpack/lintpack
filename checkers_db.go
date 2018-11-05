@@ -33,12 +33,14 @@ func GetCheckersInfo() []*CheckerInfo {
 // NewChecker returns initialized checker identified by an info.
 // info must be non-nil.
 // Panics if info describes a checker that was not properly registered.
-func NewChecker(ctx *Context, info *CheckerInfo) *Checker {
+//
+// params argument specifies per-checker options.NewChecker. Can be nil.
+func NewChecker(ctx *Context, info *CheckerInfo, params map[string]interface{}) *Checker {
 	proto, ok := prototypes[info.Name]
 	if !ok {
 		panic(fmt.Sprintf("checker with name %q not registered", info.Name))
 	}
-	return proto.constructor(ctx)
+	return proto.constructor(ctx, params)
 }
 
 // FileWalker is an interface every checker should implement.
@@ -81,11 +83,12 @@ func AddChecker(info *CheckerInfo, constructor func(*CheckerContext) FileWalker)
 
 	proto := checkerProto{
 		info: info,
-		constructor: func(ctx *Context) *Checker {
+		constructor: func(ctx *Context, params parameters) *Checker {
 			var c Checker
 			c.Info = info
 			c.ctx = CheckerContext{
 				Context: ctx,
+				Params:  params,
 				printer: astfmt.NewPrinter(ctx.FileSet),
 			}
 			c.fileWalker = constructor(&c.ctx)
