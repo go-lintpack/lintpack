@@ -182,26 +182,29 @@ func (l *linter) initCheckers() error {
 		notice := ""
 
 		switch {
-		case disabledByTags(info):
-			notice = "disabled by tags (-disableTags)"
+		case !l.filters.enable.MatchString(info.Name):
+			notice = "not enabled by name (-enable)"
+		case !enabledByTags(info):
+			notice = "not enabled by tags (-enableTags)"
 		case l.filters.disable.MatchString(info.Name):
 			notice = "disabled by name (-disable)"
-		case enabledByTags(info):
-			enabled = true
-			notice = "enabled by tags (-enableTags)"
-		case l.filters.enable.MatchString(info.Name):
-			enabled = true
-			notice = "enabled by name (-enable)"
+		case disabledByTags(info):
+			notice = "disabled by tags (-disableTags)"
 		default:
-			notice = "was not enabled"
+			enabled = true
 		}
 
-		if l.verbose {
+		if l.verbose && !enabled {
 			log.Printf("\tdebug: %s: %s", info.Name, notice)
 		}
 		if enabled {
 			// TODO(Quasilyte): use non-nil params. See #6.
 			l.checkers = append(l.checkers, lintpack.NewChecker(l.ctx, info, nil))
+		}
+	}
+	if l.verbose {
+		for _, c := range l.checkers {
+			log.Printf("\tdebug: %s is enabled", c.Info.Name)
 		}
 	}
 
