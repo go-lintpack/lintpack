@@ -30,6 +30,16 @@ type CheckerInfo struct {
 	Note string
 }
 
+// HasTag reports whether checker described by the info has specified tag.
+func (info *CheckerInfo) HasTag(tag string) bool {
+	for i := range info.Tags {
+		if info.Tags[i] == tag {
+			return true
+		}
+	}
+	return false
+}
+
 // Warning represents issue that is found by checker.
 type Warning struct {
 	// Node is an AST node that caused warning to trigger.
