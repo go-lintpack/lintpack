@@ -91,18 +91,18 @@ func (l *linter) runCheckers() error {
 			log.Fatalf("%s package is not properly loaded", pkgPath)
 		}
 		// Check the package itself.
-		l.checkPackage(pkgPath, pkgInfo)
+		l.checkPackage(pkgInfo)
 		// Check package external test (if any).
 		pkgInfo = pkgInfoMap[pkgPath+"_test"]
 		if pkgInfo != nil {
-			l.checkPackage(pkgPath+"_test", pkgInfo)
+			l.checkPackage(pkgInfo)
 		}
 	}
 
 	return nil
 }
 
-func (l *linter) checkPackage(pkgPath string, pkgInfo *loader.PackageInfo) {
+func (l *linter) checkPackage(pkgInfo *loader.PackageInfo) {
 	l.ctx.SetPackageInfo(&pkgInfo.Info, pkgInfo.Pkg)
 	for _, f := range pkgInfo.Files {
 		filename := l.getFilename(f)
