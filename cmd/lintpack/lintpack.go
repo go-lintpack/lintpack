@@ -11,6 +11,7 @@ import (
 	"text/template"
 
 	"github.com/go-lintpack/lintpack/linter/lintmain"
+	"golang.org/x/tools/go/packages"
 )
 
 func main() {
@@ -29,7 +30,7 @@ func main() {
 		fn   func() error
 	}{
 		{"parse args", p.parseArgs},
-		{"validate packages", p.validatePackages},
+		{"resolve packages", p.resolvePackages},
 		{"create main file", p.createMainFile},
 		{"build linter", p.buildLinter},
 	}
@@ -44,6 +45,10 @@ func main() {
 type packer struct {
 	// Exported fields are used inside text template.
 
+	flags struct {
+		args []string
+	}
+
 	Packages []string
 	Config   lintmain.Config
 
@@ -54,7 +59,10 @@ type packer struct {
 
 func (p *packer) parseArgs() error {
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "usage: lintpack [flags] packages...")
+		out := flag.CommandLine.Output()
+		fmt.Fprintf(out, "usage: lintpack [flags] packages...\n")
+		fmt.Fprintf(out, "package can be specified by a relative path, like `.` or `./...`\n")
+		out.Write([]byte("\n"))
 		flag.PrintDefaults()
 	}
 
@@ -65,17 +73,26 @@ func (p *packer) parseArgs() error {
 
 	flag.Parse()
 
-	p.Packages = flag.Args()
+	p.flags.args = flag.Args()
 
-	if len(p.Packages) == 0 {
+	if len(p.flags.args) == 0 {
 		return errors.New("not enough arguments: expected non-empty package list")
 	}
 
 	return nil
 }
 
-func (p *packer) validatePackages() error {
-	// TODO(quasilyte): report packages that can't be imported.
+func (p *packer) resolvePackages() error {
+	cfg := &packages.Config{Mode: packages.LoadFiles}
+	pkgs, err := packages.Load(cfg, p.flags.args...)
+	if err != nil {
+		return err
+	}
+
+	for _, pkg := range pkgs {
+		p.Packages = append(p.Packages, pkg.PkgPath)
+	}
+
 	return nil
 }
 
