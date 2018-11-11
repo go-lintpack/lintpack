@@ -45,14 +45,14 @@ func main() {
 type packer struct {
 	// Exported fields are used inside text template.
 
+	Config lintmain.Config
+
 	flags struct {
-		args []string
+		args           []string
+		outputFilename string
 	}
 
 	Packages []string
-	Config   lintmain.Config
-
-	outputFilename string
 
 	main *os.File
 }
@@ -68,7 +68,7 @@ func (p *packer) parseArgs() error {
 
 	flag.StringVar(&p.Config.Version, "linterVersion", "0.0.1",
 		`value that will be printed by the linter "version" command`)
-	flag.StringVar(&p.outputFilename, "o", "linter",
+	flag.StringVar(&p.flags.outputFilename, "o", "linter",
 		`produced binary filename`)
 
 	flag.Parse()
@@ -124,7 +124,7 @@ func (p *packer) createMainFile() error {
 
 func (p *packer) buildLinter() error {
 	command := exec.Command("go", "build",
-		"-o", p.outputFilename,
+		"-o", p.flags.outputFilename,
 		p.main.Name())
 	out, err := command.CombinedOutput()
 	if err != nil {
