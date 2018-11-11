@@ -11,6 +11,7 @@ import (
 	"text/template"
 
 	"github.com/go-lintpack/lintpack/linter/lintmain"
+	"golang.org/x/tools/go/packages"
 )
 
 func main() {
@@ -29,7 +30,7 @@ func main() {
 		fn   func() error
 	}{
 		{"parse args", p.parseArgs},
-		{"validate packages", p.validatePackages},
+		{"resolve packages", p.resolvePackages},
 		{"create main file", p.createMainFile},
 		{"build linter", p.buildLinter},
 	}
@@ -44,38 +45,54 @@ func main() {
 type packer struct {
 	// Exported fields are used inside text template.
 
-	Packages []string
-	Config   lintmain.Config
+	Config lintmain.Config
 
-	outputFilename string
+	flags struct {
+		args           []string
+		outputFilename string
+	}
+
+	Packages []string
 
 	main *os.File
 }
 
 func (p *packer) parseArgs() error {
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "usage: lintpack [flags] packages...")
+		out := flag.CommandLine.Output()
+		fmt.Fprintf(out, "usage: lintpack [flags] packages...\n")
+		fmt.Fprintf(out, "package can be specified by a relative path, like `.` or `./...`\n")
+		out.Write([]byte("\n"))
 		flag.PrintDefaults()
 	}
 
 	flag.StringVar(&p.Config.Version, "linterVersion", "0.0.1",
 		`value that will be printed by the linter "version" command`)
-	flag.StringVar(&p.outputFilename, "o", "linter",
+	flag.StringVar(&p.flags.outputFilename, "o", "linter",
 		`produced binary filename`)
 
 	flag.Parse()
 
-	p.Packages = flag.Args()
+	p.flags.args = flag.Args()
 
-	if len(p.Packages) == 0 {
+	if len(p.flags.args) == 0 {
 		return errors.New("not enough arguments: expected non-empty package list")
 	}
 
 	return nil
 }
 
-func (p *packer) validatePackages() error {
-	// TODO(quasilyte): report packages that can't be imported.
+func (p *packer) resolvePackages() error {
+	cfg := &packages.Config{Mode: packages.LoadFiles}
+	pkgs, err := packages.Load(cfg, p.flags.args...)
+	if err != nil {
+		return err
+	}
+
+	for _, pkg := range pkgs {
+		p.Packages = append(p.Packages, pkg.PkgPath)
+	}
+
 	return nil
 }
 
@@ -107,7 +124,7 @@ func (p *packer) createMainFile() error {
 
 func (p *packer) buildLinter() error {
 	command := exec.Command("go", "build",
-		"-o", p.outputFilename,
+		"-o", p.flags.outputFilename,
 		p.main.Name())
 	out, err := command.CombinedOutput()
 	if err != nil {
