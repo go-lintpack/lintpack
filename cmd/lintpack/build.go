@@ -19,7 +19,9 @@ func lintpackBuild() {
 
 	defer func() {
 		if p.main != nil {
-			_ = os.Remove(p.main.Name())
+			if err := os.Remove(p.main.Name()); err != nil {
+				log.Printf("cleanup failed: %v", err)
+			}
 		}
 	}()
 
@@ -43,14 +45,13 @@ func lintpackBuild() {
 type packer struct {
 	// Exported fields are used inside text template.
 
-	Config lintmain.Config
+	Config   lintmain.Config
+	Packages []string
 
 	flags struct {
 		args           []string
 		outputFilename string
 	}
-
-	Packages []string
 
 	main *os.File
 }

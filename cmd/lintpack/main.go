@@ -12,6 +12,8 @@ func main() {
 	cmdutil.DispatchCommand(subCommands)
 }
 
+var version = "v0.5.0"
+
 var subCommands = []*cmdutil.SubCommand{
 	{
 		Main:  lintpackBuild,
@@ -26,5 +28,5 @@ var subCommands = []*cmdutil.SubCommand{
 }
 
 func lintpackVersion() {
-	fmt.Println("unreleased/unversioned, v0.0.0")
+	fmt.Println(version)
 }
