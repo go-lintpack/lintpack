@@ -14,14 +14,14 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-func main() {
-	log.SetFlags(0)
-
+func lintpackBuild() {
 	var p packer
 
 	defer func() {
 		if p.main != nil {
-			_ = os.Remove(p.main.Name())
+			if err := os.Remove(p.main.Name()); err != nil {
+				log.Printf("cleanup failed: %v", err)
+			}
 		}
 	}()
 
@@ -45,14 +45,13 @@ func main() {
 type packer struct {
 	// Exported fields are used inside text template.
 
-	Config lintmain.Config
+	Config   lintmain.Config
+	Packages []string
 
 	flags struct {
 		args           []string
 		outputFilename string
 	}
-
-	Packages []string
 
 	main *os.File
 }
@@ -60,7 +59,7 @@ type packer struct {
 func (p *packer) parseArgs() error {
 	flag.Usage = func() {
 		out := flag.CommandLine.Output()
-		fmt.Fprintf(out, "usage: lintpack [flags] packages...\n")
+		fmt.Fprintf(out, "usage: lintpack build [flags] packages...\n")
 		fmt.Fprintf(out, "package can be specified by a relative path, like `.` or `./...`\n")
 		out.Write([]byte("\n"))
 		flag.PrintDefaults()
