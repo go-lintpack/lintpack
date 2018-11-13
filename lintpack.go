@@ -8,6 +8,35 @@ import (
 	"github.com/go-toolsmith/astfmt"
 )
 
+// CheckerParam describes a single checker customizable parameter.
+type CheckerParam struct {
+	// Value holds parameter bound value.
+	// It might be overwritten by the integrating linter.
+	//
+	// Permitted types include:
+	//	- int
+	//	- bool
+	//	- string
+	Value interface{}
+
+	// Usage gives an overview about what parameter does.
+	Usage string
+}
+
+// CheckerParams holds all checker-specific parameters.
+//
+// Provides convenient access to the loosely typed underlying map.
+type CheckerParams map[string]*CheckerParam
+
+// Int lookups pname key in underlying map and type-asserts it to int.
+func (params CheckerParams) Int(pname string) int { return params[pname].Value.(int) }
+
+// Bool lookups pname key in underlying map and type-asserts it to bool.
+func (params CheckerParams) Bool(pname string) bool { return params[pname].Value.(bool) }
+
+// String lookups pname key in underlying map and type-asserts it to string.
+func (params CheckerParams) String(pname string) string { return params[pname].Value.(string) }
+
 // CheckerInfo holds checker metadata and structured documentation.
 type CheckerInfo struct {
 	// Name is a checker name.
@@ -16,6 +45,9 @@ type CheckerInfo struct {
 	// Tags is a list of labels that can be used to enable or disable checker.
 	// Common tags are "experimental" and "performance".
 	Tags []string
+
+	// Params declares checker-specific parameters. Optional.
+	Params CheckerParams
 
 	// Summary is a short one sentence description.
 	// Should not end with a period.

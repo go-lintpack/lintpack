@@ -25,6 +25,7 @@ import (
 // Main implements sub-command entry point.
 func Main() {
 	var l linter
+	l.infoList = lintpack.GetCheckersInfo()
 
 	steps := []struct {
 		name string
@@ -49,6 +50,8 @@ type linter struct {
 	ctx *lintpack.Context
 
 	prog *loader.Program
+
+	infoList []*lintpack.CheckerInfo
 
 	checkers []*lintpack.Checker
 
@@ -177,7 +180,7 @@ func (l *linter) initCheckers() error {
 		return matchAnyTag(l.filters.enableTags, info)
 	}
 
-	for _, info := range lintpack.GetCheckersInfo() {
+	for _, info := range l.infoList {
 		enabled := false
 		notice := ""
 
@@ -246,6 +249,29 @@ func (l *linter) loadPlugin() error {
 }
 
 func (l *linter) parseArgs() error {
+	paramKey := func(info *lintpack.CheckerInfo, paramName string) string {
+		return "@" + info.Name + "." + paramName
+	}
+
+	intParams := make(map[string]*int)
+	boolParams := make(map[string]*bool)
+	stringParams := make(map[string]*string)
+	for _, info := range l.infoList {
+		for pname, param := range info.Params {
+			key := paramKey(info, pname)
+			switch v := param.Value.(type) {
+			case int:
+				intParams[key] = flag.Int(key, v, param.Usage)
+			case bool:
+				boolParams[key] = flag.Bool(key, v, param.Usage)
+			case string:
+				stringParams[key] = flag.String(key, v, param.Usage)
+			default:
+				panic("unreachable") // Checked in AddChecker
+			}
+		}
+	}
+
 	flag.StringVar(&l.pluginPath, "pluginPath", "",
 		`path to a Go plugin that provides additional checks`)
 	disableTags := flag.String("disableTags", `^experimental$|^performance$|^opinionated$`,
@@ -268,6 +294,22 @@ func (l *linter) parseArgs() error {
 		`whether to print output useful during linter debugging`)
 
 	flag.Parse()
+
+	for _, info := range l.infoList {
+		for pname, param := range info.Params {
+			key := paramKey(info, pname)
+			switch param.Value.(type) {
+			case int:
+				info.Params[pname].Value = *intParams[key]
+			case bool:
+				info.Params[pname].Value = *boolParams[key]
+			case string:
+				info.Params[pname].Value = *stringParams[key]
+			default:
+				panic("unreachable") // Checked in AddChecker
+			}
+		}
+	}
 
 	var err error
 

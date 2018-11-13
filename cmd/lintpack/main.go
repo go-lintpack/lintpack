@@ -12,7 +12,7 @@ func main() {
 	cmdutil.DispatchCommand(subCommands)
 }
 
-var version = "v0.5.0"
+var version = "v0.5.1"
 
 var subCommands = []*cmdutil.SubCommand{
 	{
