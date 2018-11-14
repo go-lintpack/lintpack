@@ -31,7 +31,9 @@ func Main() {
 		name string
 		fn   func() error
 	}{
+		{"bind checker params", l.bindCheckerParams},
 		{"parse args", l.parseArgs},
+		{"assign checker params", l.assignCheckerParams},
 		{"load program", l.loadProgram},
 		{"load plugin", l.loadPlugin},
 		{"init checkers", l.initCheckers},
@@ -58,6 +60,8 @@ type linter struct {
 	packages []string
 
 	foundIssues bool
+
+	checkerParams boundCheckerParams
 
 	filters struct {
 		disableTags *regexp.Regexp
@@ -248,17 +252,21 @@ func (l *linter) loadPlugin() error {
 	return hotload.CheckersFromDylib(l.pluginPath)
 }
 
-func (l *linter) parseArgs() error {
-	paramKey := func(info *lintpack.CheckerInfo, paramName string) string {
-		return "@" + info.Name + "." + paramName
-	}
+type boundCheckerParams struct {
+	ints    map[string]*int
+	bools   map[string]*bool
+	strings map[string]*string
+}
 
+// bindCheckerParams registers command-line flags for every checker parameter.
+func (l *linter) bindCheckerParams() error {
 	intParams := make(map[string]*int)
 	boolParams := make(map[string]*bool)
 	stringParams := make(map[string]*string)
+
 	for _, info := range l.infoList {
 		for pname, param := range info.Params {
-			key := paramKey(info, pname)
+			key := l.checkerParamKey(info, pname)
 			switch v := param.Value.(type) {
 			case int:
 				intParams[key] = flag.Int(key, v, param.Usage)
@@ -272,6 +280,18 @@ func (l *linter) parseArgs() error {
 		}
 	}
 
+	l.checkerParams.ints = intParams
+	l.checkerParams.bools = boolParams
+	l.checkerParams.strings = stringParams
+
+	return nil
+}
+
+func (l *linter) checkerParamKey(info *lintpack.CheckerInfo, pname string) string {
+	return "@" + info.Name + "." + pname
+}
+
+func (l *linter) parseArgs() error {
 	flag.StringVar(&l.pluginPath, "pluginPath", "",
 		`path to a Go plugin that provides additional checks`)
 	disableTags := flag.String("disableTags", `^experimental$|^performance$|^opinionated$`,
@@ -295,22 +315,6 @@ func (l *linter) parseArgs() error {
 
 	flag.Parse()
 
-	for _, info := range l.infoList {
-		for pname, param := range info.Params {
-			key := paramKey(info, pname)
-			switch param.Value.(type) {
-			case int:
-				info.Params[pname].Value = *intParams[key]
-			case bool:
-				info.Params[pname].Value = *boolParams[key]
-			case string:
-				info.Params[pname].Value = *stringParams[key]
-			default:
-				panic("unreachable") // Checked in AddChecker
-			}
-		}
-	}
-
 	var err error
 
 	l.packages = flag.Args()
@@ -329,6 +333,32 @@ func (l *linter) parseArgs() error {
 	l.filters.enable, err = regexp.Compile(*enable)
 	if err != nil {
 		return fmt.Errorf("-enable: %v", err)
+	}
+
+	return nil
+}
+
+// assignCheckerParams initializes checker parameter values using
+// values that are coming from the command-line arguments.
+func (l *linter) assignCheckerParams() error {
+	intParams := l.checkerParams.ints
+	boolParams := l.checkerParams.bools
+	stringParams := l.checkerParams.strings
+
+	for _, info := range l.infoList {
+		for pname, param := range info.Params {
+			key := l.checkerParamKey(info, pname)
+			switch param.Value.(type) {
+			case int:
+				info.Params[pname].Value = *intParams[key]
+			case bool:
+				info.Params[pname].Value = *boolParams[key]
+			case string:
+				info.Params[pname].Value = *stringParams[key]
+			default:
+				panic("unreachable") // Checked in AddChecker
+			}
+		}
 	}
 
 	return nil
