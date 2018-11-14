@@ -35,6 +35,17 @@ func addChecker(info *CheckerInfo, constructor func(*CheckerContext) FileWalker)
 		panic(fmt.Sprintf("checker with name %q already registered", info.Name))
 	}
 
+	// Validate param value type.
+	for pname, param := range info.Params {
+		switch param.Value.(type) {
+		case string, int, bool:
+			// OK.
+		default:
+			panic(fmt.Sprintf("unsupported %q param type value: %T",
+				pname, param.Value))
+		}
+	}
+
 	trimDocumentation := func(d *CheckerInfo) {
 		fields := []*string{
 			&d.Summary,
