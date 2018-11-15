@@ -65,8 +65,8 @@ func printSubCommands(cmdList []*SubCommand) {
 	log.Println("Supported sub-commands:")
 	for _, cmd := range cmdList {
 		log.Printf("\t%s - %s", cmd.Name, cmd.Short)
-		for i := range cmd.Examples {
-			log.Printf("\t\t$ %s", cmd.Examples[i])
+		for _, ex := range cmd.Examples {
+			log.Printf("\t\t$ %s", ex)
 		}
 	}
 }
