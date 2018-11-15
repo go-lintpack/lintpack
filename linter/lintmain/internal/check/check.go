@@ -308,7 +308,7 @@ func (l *linter) parseArgs() error {
 		`whether to check test files`)
 	flag.BoolVar(&l.shorterErrLocation, `shorterErrLocation`, true,
 		`whether to replace error location prefix with $GOROOT and $GOPATH`)
-	flag.BoolVar(&l.coloredOutput, `coloredOutput`, true,
+	flag.BoolVar(&l.coloredOutput, `coloredOutput`, false,
 		`whether to use colored output`)
 	flag.BoolVar(&l.verbose, `verbose`, false,
 		`whether to print output useful during linter debugging`)
