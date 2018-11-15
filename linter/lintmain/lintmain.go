@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-lintpack/lintpack/internal/cmdutil"
 	"github.com/go-lintpack/lintpack/linter/lintmain/internal/check"
+	"github.com/go-lintpack/lintpack/linter/lintmain/internal/lintdoc"
 )
 
 // Config is used to parametrize the linter.
@@ -46,6 +47,16 @@ func Run(cfg Config) {
 			Name:     "version",
 			Short:    "print linter version",
 			Examples: makeExamples("%s version"),
+		},
+		{
+			Main:  lintdoc.Main,
+			Name:  "doc",
+			Short: "get installed checkers documentation",
+			Examples: makeExamples(
+				"%s doc -help",
+				"%s doc",
+				"%s doc checkerName",
+			),
 		},
 	}
 
