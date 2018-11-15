@@ -65,8 +65,10 @@ func (p *packer) parseArgs() error {
 		flag.PrintDefaults()
 	}
 
-	flag.StringVar(&p.Config.Version, "linterVersion", "0.0.1",
+	flag.StringVar(&p.Config.Version, "linter.version", "0.0.1",
 		`value that will be printed by the linter "version" command`)
+	flag.StringVar(&p.Config.Name, "linter.name", "linter",
+		`name associated with linter`)
 	flag.StringVar(&p.flags.outputFilename, "o", "linter",
 		`produced binary filename`)
 
@@ -76,6 +78,9 @@ func (p *packer) parseArgs() error {
 
 	if len(p.flags.args) == 0 {
 		return errors.New("not enough arguments: expected non-empty package list")
+	}
+	if p.Config.Name == "" {
+		return errors.New("-linter.name can't be empty")
 	}
 
 	return nil
