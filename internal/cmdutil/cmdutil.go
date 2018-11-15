@@ -15,6 +15,9 @@ type SubCommand struct {
 
 	// Short describes command in one line of text.
 	Short string
+
+	// Examples shows one or more sub-command execution examples.
+	Examples []string
 }
 
 // DispatchCommand runs sub command out of specified cmdList based on
@@ -62,5 +65,8 @@ func printSubCommands(cmdList []*SubCommand) {
 	log.Println("Supported sub-commands:")
 	for _, cmd := range cmdList {
 		log.Printf("\t%s - %s", cmd.Name, cmd.Short)
+		for i := range cmd.Examples {
+			log.Printf("\t\t$ %s", cmd.Examples[i])
+		}
 	}
 }
