@@ -1,12 +1,35 @@
 package lintpack
 
 import (
+	"fmt"
 	"go/ast"
 	"go/token"
 	"go/types"
 
 	"github.com/go-toolsmith/astfmt"
 )
+
+// CheckerCollection provides additional information for a group of checkers.
+type CheckerCollection struct {
+	// URL describes a link for a main source of information on the collection.
+	URL string
+}
+
+// AddChecker registers a new checker into a checkers pool.
+// Constructor is used to create a new checker instance.
+// Checker name (defined in CheckerInfo.Name) must be unique.
+//
+// CheckerInfo.Collection is automatically set to the coll (the receiver).
+//
+// If checker is never needed, for example if it is disabled,
+// constructor will not be called.
+func (coll *CheckerCollection) AddChecker(info *CheckerInfo, constructor func(*CheckerContext) FileWalker) {
+	if coll == nil {
+		panic(fmt.Sprintf("adding checker to a nil collection"))
+	}
+	info.Collection = coll
+	addChecker(info, constructor)
+}
 
 // CheckerParam describes a single checker customizable parameter.
 type CheckerParam struct {
@@ -64,6 +87,9 @@ type CheckerInfo struct {
 
 	// Note is an optional caution message or advice.
 	Note string
+
+	// Collection establishes a checker-to-collection relationship.
+	Collection *CheckerCollection
 }
 
 // GetCheckersInfo returns a checkers info list for all registered checkers.
@@ -109,16 +135,6 @@ type Warning struct {
 
 	// Text is warning message without source location info.
 	Text string
-}
-
-// AddChecker registers a new checker into a checkers pool.
-// Constructor is used to create a new checker instance.
-// Checker name (defined in CheckerInfo.Name) must be unique.
-//
-// If checker is never needed, for example if it is disabled,
-// constructor will not be called.
-func AddChecker(info *CheckerInfo, constructor func(*CheckerContext) FileWalker) {
-	addChecker(info, constructor)
 }
 
 // NewChecker returns initialized checker identified by an info.
