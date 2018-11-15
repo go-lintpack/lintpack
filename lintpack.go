@@ -11,7 +11,7 @@ import (
 
 // CheckerCollection provides additional information for a group of checkers.
 type CheckerCollection struct {
-	// URL describes a link for a main source of information on the collection.
+	// URL is a link for a main source of information on the collection.
 	URL string
 }
 
