@@ -114,12 +114,14 @@ func (l *linter) checkPackage(pkg *packages.Package) {
 }
 
 func (l *linter) checkFile(f *ast.File) {
+	warnings := make([][]lintpack.Warning, len(l.checkers))
+
 	var wg sync.WaitGroup
 	wg.Add(len(l.checkers))
-	for _, c := range l.checkers {
+	for i, c := range l.checkers {
 		// All checkers are expected to use *lint.Context
 		// as read-only structure, so no copying is required.
-		go func(c *lintpack.Checker) {
+		go func(i int, c *lintpack.Checker) {
 			defer func() {
 				wg.Done()
 				// Checker signals unexpected error with panic(error).
@@ -138,17 +140,23 @@ func (l *linter) checkFile(f *ast.File) {
 			}()
 
 			for _, warn := range c.Check(f) {
-				l.foundIssues = true
-				loc := l.ctx.FileSet.Position(warn.Node.Pos()).String()
-				if l.shorterErrLocation {
-					loc = shortenLocation(loc)
-				}
-
-				printWarning(l, c.Info.Name, loc, warn.Text)
+				warnings[i] = append(warnings[i], warn)
 			}
-		}(c)
+		}(i, c)
 	}
 	wg.Wait()
+
+	for i, c := range l.checkers {
+		for _, warn := range warnings[i] {
+			l.foundIssues = true
+			loc := l.ctx.FileSet.Position(warn.Node.Pos()).String()
+			if l.shorterErrLocation {
+				loc = shortenLocation(loc)
+			}
+			printWarning(l, c.Info.Name, loc, warn.Text)
+		}
+	}
+
 }
 
 func (l *linter) initCheckers() error {
