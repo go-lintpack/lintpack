@@ -75,6 +75,8 @@ type linter struct {
 
 	pluginPath string
 
+	workDir string
+
 	exitCode           int
 	checkTests         bool
 	checkGenerated     bool
@@ -141,7 +143,7 @@ func (l *linter) checkFile(f *ast.File) {
 				l.foundIssues = true
 				loc := l.ctx.FileSet.Position(warn.Node.Pos()).String()
 				if l.shorterErrLocation {
-					loc = shortenLocation(loc)
+					loc = l.shortenLocation(loc)
 				}
 
 				printWarning(l, c.Info.Name, loc, warn.Text)
@@ -323,6 +325,14 @@ func (l *linter) parseArgs() error {
 		return fmt.Errorf("-enable: %v", err)
 	}
 
+	if l.shorterErrLocation {
+		wd, err := os.Getwd()
+		if err != nil {
+			log.Printf("getwd: %v", err)
+		}
+		l.workDir = wd
+	}
+
 	return nil
 }
 
@@ -364,15 +374,25 @@ func (l *linter) getFilename(f *ast.File) string {
 	return filepath.Base(l.fset.Position(f.Pos()).Filename)
 }
 
-func shortenLocation(loc string) string {
+func (l *linter) shortenLocation(loc string) string {
+	// If possible, construct relative path.
+	relLoc := loc
+	if l.workDir != "" {
+		relLoc = strings.Replace(loc, l.workDir, ".", 1)
+	}
+
 	switch {
 	case strings.HasPrefix(loc, build.Default.GOPATH):
-		return strings.Replace(loc, build.Default.GOPATH, "$GOPATH", 1)
+		loc = strings.Replace(loc, build.Default.GOPATH, "$GOPATH", 1)
 	case strings.HasPrefix(loc, build.Default.GOROOT):
-		return strings.Replace(loc, build.Default.GOROOT, "$GOROOT", 1)
-	default:
-		return loc
+		loc = strings.Replace(loc, build.Default.GOROOT, "$GOROOT", 1)
 	}
+
+	// Return the representation that is shorter.
+	if len(relLoc) < len(loc) {
+		return relLoc
+	}
+	return loc
 }
 
 func printWarning(l *linter, rule, loc, warn string) {
