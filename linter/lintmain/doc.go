@@ -1,4 +1,4 @@
-package lintdoc
+package lintmain
 
 import (
 	"flag"
@@ -10,8 +10,8 @@ import (
 	"github.com/go-lintpack/lintpack"
 )
 
-// Main implements sub-command entry point.
-func Main() {
+// docMain implements sub-command entry point.
+func docMain() {
 	flag.Parse()
 
 	switch args := flag.Args(); len(args) {

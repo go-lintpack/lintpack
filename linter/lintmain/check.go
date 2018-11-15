@@ -1,4 +1,4 @@
-package check
+package lintmain
 
 import (
 	"errors"
@@ -17,13 +17,12 @@ import (
 	"sync"
 
 	"github.com/go-lintpack/lintpack"
-	"github.com/go-lintpack/lintpack/linter/lintmain/hotload"
 	"github.com/logrusorgru/aurora"
 	"golang.org/x/tools/go/loader"
 )
 
-// Main implements sub-command entry point.
-func Main() {
+// checkMain implements sub-command entry point.
+func checkMain() {
 	var l linter
 	l.infoList = lintpack.GetCheckersInfo()
 
@@ -249,7 +248,7 @@ func (l *linter) loadProgram() error {
 }
 
 func (l *linter) loadPlugin() error {
-	return hotload.CheckersFromDylib(l.pluginPath)
+	return checkersFromDylib(l.pluginPath)
 }
 
 type boundCheckerParams struct {

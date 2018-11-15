@@ -5,8 +5,6 @@ import (
 	"log"
 
 	"github.com/go-lintpack/lintpack/internal/cmdutil"
-	"github.com/go-lintpack/lintpack/linter/lintmain/check"
-	"github.com/go-lintpack/lintpack/linter/lintmain/lintdoc"
 )
 
 // Config is used to parametrize the linter.
@@ -33,7 +31,7 @@ func Run(cfg Config) {
 
 	subCommands := []*cmdutil.SubCommand{
 		{
-			Main:  check.Main,
+			Main:  checkMain,
 			Name:  "check",
 			Short: "run linter over specified targets",
 			Examples: makeExamples(
@@ -49,7 +47,7 @@ func Run(cfg Config) {
 			Examples: makeExamples("%s version"),
 		},
 		{
-			Main:  lintdoc.Main,
+			Main:  docMain,
 			Name:  "doc",
 			Short: "get installed checkers documentation",
 			Examples: makeExamples(

@@ -1,4 +1,4 @@
-package hotload
+package lintmain
 
 import (
 	"fmt"
@@ -7,8 +7,8 @@ import (
 	"github.com/go-lintpack/lintpack"
 )
 
-// CheckersFromDylib loads checkers provided by a dynamic lybrary found under path.
-func CheckersFromDylib(path string) error {
+// checkersFromDylib loads checkers provided by a dynamic lybrary found under path.
+func checkersFromDylib(path string) error {
 	if path == "" {
 		return nil // Nothing to do
 	}
