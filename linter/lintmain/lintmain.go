@@ -1,8 +1,8 @@
 package lintmain
 
 import (
+	"fmt"
 	"log"
-	"strings"
 
 	"github.com/go-lintpack/lintpack/internal/cmdutil"
 	"github.com/go-lintpack/lintpack/linter/lintmain/internal/check"
@@ -24,10 +24,8 @@ func Run(cfg Config) {
 
 	// makeExample replaces all ${linter} placeholders to a bound linter name.
 	makeExamples := func(examples ...string) []string {
-		from := "${linter} "
-		to := cfg.Name + " "
 		for i := range examples {
-			examples[i] = strings.Replace(examples[i], from, to, 1)
+			examples[i] = fmt.Sprintf(examples[i], cfg.Name)
 		}
 		return examples
 	}
@@ -38,16 +36,16 @@ func Run(cfg Config) {
 			Name:  "check",
 			Short: "run linter over specified targets",
 			Examples: makeExamples(
-				"${linter} check -help",
-				"${linter} check -disableTags=none strings bytes",
-				"${linter} check -enableTags=diagnostic ./...",
+				"%s check -help",
+				"%s check -disableTags=none strings bytes",
+				"%s check -enableTags=diagnostic ./...",
 			),
 		},
 		{
 			Main:     printVersion,
 			Name:     "version",
 			Short:    "print linter version",
-			Examples: makeExamples("${linter} version"),
+			Examples: makeExamples("%s version"),
 		},
 	}
 
