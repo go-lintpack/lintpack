@@ -17,7 +17,7 @@ import (
 	"sync"
 
 	"github.com/go-lintpack/lintpack"
-	"github.com/go-lintpack/lintpack/linter/lintmain/internal/hotload"
+	"github.com/go-lintpack/lintpack/linter/lintmain/hotload"
 	"github.com/logrusorgru/aurora"
 	"golang.org/x/tools/go/loader"
 )

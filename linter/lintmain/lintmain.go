@@ -5,8 +5,8 @@ import (
 	"log"
 
 	"github.com/go-lintpack/lintpack/internal/cmdutil"
-	"github.com/go-lintpack/lintpack/linter/lintmain/internal/check"
-	"github.com/go-lintpack/lintpack/linter/lintmain/internal/lintdoc"
+	"github.com/go-lintpack/lintpack/linter/lintmain/check"
+	"github.com/go-lintpack/lintpack/linter/lintmain/lintdoc"
 )
 
 // Config is used to parametrize the linter.
