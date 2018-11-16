@@ -3,7 +3,7 @@
 Install `lintpack`:
 
 ```bash
-go get -v -u github.com/lintpack/lintpack/...
+go get -v -u github.com/go-lintpack/lintpack/...
 ```
 
 Install checkers from [go-critic/checkers](https://github.com/go-critic/checkers):
