@@ -50,6 +50,20 @@ func saneCheckersList(t *testing.T) []*lintpack.CheckerInfo {
 	return saneList
 }
 
+// IntegrationTest specifies integration test options.
+type IntegrationTest struct {
+	// Packages list which packages tested linter should import.
+	Packages []string
+
+	// Dir specifies a path to integration tests.
+	Dir string
+}
+
+// TestIntegration runs linter integration tests using default options.
+func TestIntegration(t *testing.T) {
+	defaultIntegrationTest().Run(t)
+}
+
 // TestCheckers runs end2end tests over all registered checkers using default options.
 //
 // TODO(Quasilyte): document default options.
