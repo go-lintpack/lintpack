@@ -438,18 +438,18 @@ func loadPackages(cfg *packages.Config, patterns []string) ([]*packages.Package,
 	}
 	mustBeNil := func(pkg *packages.Package) {
 		if pkg != nil {
-			panic(fmt.Sprintf("nil assertion failed"))
+			panic("nil assertion failed")
 		}
 	}
 	for _, pkg := range pkgs {
 		switch {
-		case strings.HasSuffix(pkg.Name, "_test"):
-			key := pkg.Name[:len(pkg.Name)-len("_test")]
+		case strings.HasSuffix(pkg.PkgPath, "_test"):
+			key := pkg.PkgPath[:len(pkg.PkgPath)-len("_test")]
 			p := internPack(key)
 			mustBeNil(p.externalTest)
 			p.externalTest = pkg
 		case strings.Contains(pkg.ID, ".test]"):
-			p := internPack(pkg.Name)
+			p := internPack(pkg.PkgPath)
 			mustBeNil(p.internalTest)
 			p.internalTest = pkg
 		case pkg.Name == "main" && strings.HasSuffix(pkg.PkgPath, ".test"):
@@ -457,7 +457,7 @@ func loadPackages(cfg *packages.Config, patterns []string) ([]*packages.Package,
 		case pkg.Name == "":
 			// Empty package. Skip.
 		default:
-			p := internPack(pkg.Name)
+			p := internPack(pkg.PkgPath)
 			mustBeNil(p.base)
 			p.base = pkg
 		}
