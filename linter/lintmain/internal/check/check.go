@@ -422,33 +422,62 @@ func loadPackages(cfg *packages.Config, patterns []string) ([]*packages.Package,
 		return nil, err
 	}
 
+	type pack struct {
+		base         *packages.Package
+		internalTest *packages.Package
+		externalTest *packages.Package
+	}
+	packs := make(map[string]*pack)
+	internPack := func(key string) *pack {
+		p, ok := packs[key]
+		if !ok {
+			p = &pack{}
+			packs[key] = p
+		}
+		return p
+	}
+	mustBeNil := func(pkg *packages.Package) {
+		if pkg != nil {
+			panic("nil assertion failed")
+		}
+	}
+	for _, pkg := range pkgs {
+		switch {
+		case strings.HasSuffix(pkg.PkgPath, "_test"):
+			key := pkg.PkgPath[:len(pkg.PkgPath)-len("_test")]
+			p := internPack(key)
+			mustBeNil(p.externalTest)
+			p.externalTest = pkg
+		case strings.Contains(pkg.ID, ".test]"):
+			p := internPack(pkg.PkgPath)
+			mustBeNil(p.internalTest)
+			p.internalTest = pkg
+		case pkg.Name == "main" && strings.HasSuffix(pkg.PkgPath, ".test"):
+			// Test binary. Skip.
+		case pkg.Name == "":
+			// Empty package. Skip.
+		default:
+			p := internPack(pkg.PkgPath)
+			mustBeNil(p.base)
+			p.base = pkg
+		}
+	}
+
 	result := pkgs[:0]
+	for key, p := range packs {
+		if p.externalTest != nil {
+			result = append(result, p.externalTest)
+		}
 
-	// First pkgs traversal selects external tests and
-	// packages built for testing.
-	// If there is no tests for the package,
-	// we're going to check them during the second traversal
-	// which visits normal package if only it was
-	// not checked during the first traversal.
-	withTests := make(map[string]bool)
-	for _, pkg := range pkgs {
-		if !strings.Contains(pkg.ID, ".test]") {
-			continue
-		}
-		result = append(result, pkg)
-		withTests[pkg.PkgPath] = true
-	}
-	for _, pkg := range pkgs {
-		if strings.HasSuffix(pkg.PkgPath, ".test") {
-			continue
-		}
-		if pkg.ID != pkg.PkgPath {
-			continue
-		}
-		if !withTests[pkg.PkgPath] {
-			result = append(result, pkg)
+		switch {
+		case p.internalTest != nil:
+			// Prefer tests to the base package, if present.
+			result = append(result, p.internalTest)
+		case p.base != nil:
+			result = append(result, p.base)
+		default:
+			panic(fmt.Sprintf("empty pack %q", key))
 		}
 	}
-
 	return result, nil
 }
