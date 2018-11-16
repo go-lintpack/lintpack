@@ -2,7 +2,6 @@ package linttest
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -117,9 +116,6 @@ func (cfg *IntegrationTest) runTest(t *testing.T, linter, gopath string) {
 
 func (cfg *IntegrationTest) buildLinter() (string, error) {
 	tmpDir := os.TempDir()
-	if tmpDir == "" {
-		return "", errors.New("os.TempDir() returned empty string")
-	}
 	linter := filepath.Join(tmpDir, "_lintpack_inttest_linter_")
 
 	args := append([]string{"build", "-o", linter}, cfg.Packages...)
