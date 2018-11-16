@@ -91,12 +91,12 @@ func (cfg *IntegrationTest) runTest(t *testing.T, linter, gopath string) {
 		}
 
 		// Get the actual execution output.
-		var have string
 		cmd := exec.Command(linter, runParams...)
 		cmd.Env = append([]string{}, os.Environ()...) // Copy parent env
 		cmd.Env = append(cmd.Env, "GOPATH="+gopath)   // Override GOPATH
 		out, err := cmd.CombinedOutput()
 		out = bytes.TrimSpace(out)
+		var have string
 		if err != nil {
 			// Error is prepended to the beginning.
 			have = err.Error() + "\n" + string(out)
