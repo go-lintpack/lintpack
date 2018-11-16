@@ -429,11 +429,11 @@ func loadPackages(cfg *packages.Config, patterns []string) ([]*packages.Package,
 	}
 	packs := make(map[string]*pack)
 	internPack := func(key string) *pack {
-		if p := packs[key]; p != nil {
-			return p
+		p, ok := packs[key]
+		if !ok {
+			p = &pack{}
+			packs[key] = p
 		}
-		p := &pack{}
-		packs[key] = p
 		return p
 	}
 	mustBeNil := func(pkg *packages.Package) {
