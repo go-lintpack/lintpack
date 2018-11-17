@@ -247,7 +247,9 @@ func (l *linter) loadProgram() error {
 }
 
 func (l *linter) loadPlugin() error {
-	return hotload.CheckersFromDylib(l.pluginPath)
+	infoList, err := hotload.CheckersFromDylib(l.infoList, l.pluginPath)
+	l.infoList = infoList
+	return err
 }
 
 type boundCheckerParams struct {
