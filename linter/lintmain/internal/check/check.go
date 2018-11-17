@@ -204,8 +204,7 @@ func (l *linter) initCheckers() error {
 			log.Printf("\tdebug: %s: %s", info.Name, notice)
 		}
 		if enabled {
-			// TODO(Quasilyte): use non-nil params. See #6.
-			l.checkers = append(l.checkers, lintpack.NewChecker(l.ctx, info, nil))
+			l.checkers = append(l.checkers, lintpack.NewChecker(l.ctx, info))
 		}
 	}
 	if l.verbose {
