@@ -140,10 +140,8 @@ type Warning struct {
 // NewChecker returns initialized checker identified by an info.
 // info must be non-nil.
 // Panics if info describes a checker that was not properly registered.
-//
-// params argument specifies per-checker options.NewChecker. Can be nil.
-func NewChecker(ctx *Context, info *CheckerInfo, params map[string]interface{}) *Checker {
-	return newChecker(ctx, info, params)
+func NewChecker(ctx *Context, info *CheckerInfo) *Checker {
+	return newChecker(ctx, info)
 }
 
 // Context is a readonly state shared among every checker.
@@ -226,9 +224,6 @@ func (c *Context) SetFileInfo(name string, f *ast.File) {
 // Fields that are not from Context itself are writeable.
 type CheckerContext struct {
 	*Context
-
-	// Params hold checker-specific set of options.
-	Params parameters
 
 	// printer used to format warning text.
 	printer *astfmt.Printer

@@ -10,7 +10,7 @@ import (
 
 type checkerProto struct {
 	info        *CheckerInfo
-	constructor func(*Context, parameters) *Checker
+	constructor func(*Context) *Checker
 }
 
 // prototypes is a set of registered checkers that are not yet instantiated.
@@ -67,12 +67,11 @@ func addChecker(info *CheckerInfo, constructor func(*CheckerContext) FileWalker)
 
 	proto := checkerProto{
 		info: info,
-		constructor: func(ctx *Context, params parameters) *Checker {
+		constructor: func(ctx *Context) *Checker {
 			var c Checker
 			c.Info = info
 			c.ctx = CheckerContext{
 				Context: ctx,
-				Params:  params,
 				printer: astfmt.NewPrinter(ctx.FileSet),
 			}
 			c.fileWalker = constructor(&c.ctx)
@@ -83,10 +82,10 @@ func addChecker(info *CheckerInfo, constructor func(*CheckerContext) FileWalker)
 	prototypes[info.Name] = proto
 }
 
-func newChecker(ctx *Context, info *CheckerInfo, params map[string]interface{}) *Checker {
+func newChecker(ctx *Context, info *CheckerInfo) *Checker {
 	proto, ok := prototypes[info.Name]
 	if !ok {
 		panic(fmt.Sprintf("checker with name %q not registered", info.Name))
 	}
-	return proto.constructor(ctx, params)
+	return proto.constructor(ctx)
 }
