@@ -2,7 +2,7 @@ package linttest
 
 import (
 	"go/ast"
-	"go/parser"
+	"go/token"
 	"go/types"
 	"path/filepath"
 	"runtime"
@@ -11,7 +11,8 @@ import (
 	"testing"
 
 	"github.com/go-lintpack/lintpack"
-	"golang.org/x/tools/go/loader"
+	"github.com/go-toolsmith/pkgload"
+	"golang.org/x/tools/go/packages"
 )
 
 var sizes = types.SizesFor("gc", runtime.GOARCH)
@@ -22,26 +23,28 @@ func saneCheckersList(t *testing.T) []*lintpack.CheckerInfo {
 	for _, info := range lintpack.GetCheckersInfo() {
 		pkgPath := "github.com/go-lintpack/lintpack/linttest/testdata/sanity"
 		t.Run("sanity/"+info.Name, func(t *testing.T) {
-			prog := newProg(t, pkgPath)
-			pkgInfo := prog.Imported[pkgPath]
-			ctx := &lintpack.Context{
-				SizesInfo: sizes,
-				FileSet:   prog.Fset,
-				TypesInfo: &pkgInfo.Info,
-				Pkg:       pkgInfo.Pkg,
-			}
-			c := lintpack.NewChecker(ctx, info)
-			defer func() {
-				r := recover()
-				if r != nil {
-					t.Errorf("unexpected panic: %v\n%s", r, debug.Stack())
-				} else {
-					saneList = append(saneList, info)
+			fset := token.NewFileSet()
+			pkgs := newPackages(t, pkgPath, fset)
+			for _, pkg := range pkgs {
+				ctx := &lintpack.Context{
+					SizesInfo: sizes,
+					FileSet:   fset,
+					TypesInfo: pkg.TypesInfo,
+					Pkg:       pkg.Types,
 				}
-			}()
-			for _, f := range pkgInfo.Files {
-				ctx.SetFileInfo(getFilename(prog, f), f)
-				_ = c.Check(f)
+				c := lintpack.NewChecker(ctx, info)
+				defer func() {
+					r := recover()
+					if r != nil {
+						t.Errorf("unexpected panic: %v\n%s", r, debug.Stack())
+					} else {
+						saneList = append(saneList, info)
+					}
+				}()
+				for _, f := range pkg.Syntax {
+					ctx.SetFileInfo(getFilename(fset, f), f)
+					_ = c.Check(f)
+				}
 			}
 		})
 	}
@@ -72,26 +75,25 @@ func TestCheckers(t *testing.T) {
 		t.Run(info.Name, func(t *testing.T) {
 			pkgPath := "./testdata/" + info.Name
 
-			prog := newProg(t, pkgPath)
-			pkgInfo := prog.Imported[pkgPath]
-			ctx := &lintpack.Context{
-				SizesInfo: sizes,
-				FileSet:   prog.Fset,
-				TypesInfo: &pkgInfo.Info,
-				Pkg:       pkgInfo.Pkg,
+			fset := token.NewFileSet()
+			pkgs := newPackages(t, pkgPath, fset)
+			for _, pkg := range pkgs {
+				ctx := &lintpack.Context{
+					SizesInfo: sizes,
+					FileSet:   fset,
+					TypesInfo: pkg.TypesInfo,
+					Pkg:       pkg.Types,
+				}
+				c := lintpack.NewChecker(ctx, info)
+				checkFiles(t, c, ctx, pkg)
 			}
-			c := lintpack.NewChecker(ctx, info)
-
-			checkFiles(t, c, ctx, prog, pkgPath)
 		})
 	}
 }
 
-func checkFiles(t *testing.T, c *lintpack.Checker, ctx *lintpack.Context, prog *loader.Program, pkgPath string) {
-	files := prog.Imported[pkgPath].Files
-
-	for _, f := range files {
-		filename := getFilename(prog, f)
+func checkFiles(t *testing.T, c *lintpack.Checker, ctx *lintpack.Context, pkg *packages.Package) {
+	for _, f := range pkg.Syntax {
+		filename := getFilename(ctx.FileSet, f)
 		testFilename := filepath.Join("testdata", c.Info.Name, filename)
 		goldenWarns := newGoldenFile(t, testFilename)
 
@@ -130,28 +132,43 @@ func stripDirectives(f *ast.File) {
 	}
 }
 
-func getFilename(prog *loader.Program, f *ast.File) string {
+func getFilename(fset *token.FileSet, f *ast.File) string {
 	// see https://github.com/golang/go/issues/24498
-	return filepath.Base(prog.Fset.Position(f.Pos()).Filename)
+	return filepath.Base(fset.Position(f.Pos()).Filename)
 }
 
-func newProg(t *testing.T, pkgPath string) *loader.Program {
-	conf := loader.Config{
-		ParserMode: parser.ParseComments,
-		TypeChecker: types.Config{
-			Sizes: sizes,
-		},
+func newPackages(t *testing.T, pattern string, fset *token.FileSet) []*packages.Package {
+	cfg := packages.Config{
+		Mode:  packages.LoadSyntax,
+		Tests: true,
+		Fset:  fset,
 	}
-	if _, err := conf.FromArgs([]string{pkgPath}, true); err != nil {
-		t.Fatalf("resolve packages: %v", err)
-	}
-	prog, err := conf.Load()
+	pkgs, err := loadPackages(&cfg, []string{pattern})
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("load package: %v", err)
 	}
-	pkgInfo := prog.Imported[pkgPath]
-	if pkgInfo == nil || !pkgInfo.TransitivelyErrorFree {
-		t.Fatalf("%s package is not properly loaded", pkgPath)
+	return pkgs
+}
+
+// TODO(Quasilyte): copied from check.go. Should it be added to pkgload?
+func loadPackages(cfg *packages.Config, patterns []string) ([]*packages.Package, error) {
+	pkgs, err := packages.Load(cfg, patterns...)
+	if err != nil {
+		return nil, err
 	}
-	return prog
+
+	result := pkgs[:0]
+	pkgload.VisitUnits(pkgs, func(u *pkgload.Unit) {
+		if u.ExternalTest != nil {
+			result = append(result, u.ExternalTest)
+		}
+
+		if u.Test != nil {
+			// Prefer tests to the base package, if present.
+			result = append(result, u.Test)
+		} else {
+			result = append(result, u.Base)
+		}
+	})
+	return result, nil
 }
