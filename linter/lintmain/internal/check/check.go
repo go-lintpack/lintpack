@@ -19,6 +19,7 @@ import (
 
 	"github.com/go-lintpack/lintpack"
 	"github.com/go-lintpack/lintpack/linter/lintmain/internal/hotload"
+	"github.com/go-toolsmith/pkgload"
 	"github.com/logrusorgru/aurora"
 	"golang.org/x/tools/go/packages"
 )
@@ -423,62 +424,18 @@ func loadPackages(cfg *packages.Config, patterns []string) ([]*packages.Package,
 		return nil, err
 	}
 
-	type pack struct {
-		base         *packages.Package
-		internalTest *packages.Package
-		externalTest *packages.Package
-	}
-	packs := make(map[string]*pack)
-	internPack := func(key string) *pack {
-		p, ok := packs[key]
-		if !ok {
-			p = &pack{}
-			packs[key] = p
-		}
-		return p
-	}
-	mustBeNil := func(pkg *packages.Package) {
-		if pkg != nil {
-			panic("nil assertion failed")
-		}
-	}
-	for _, pkg := range pkgs {
-		switch {
-		case strings.HasSuffix(pkg.PkgPath, "_test"):
-			key := pkg.PkgPath[:len(pkg.PkgPath)-len("_test")]
-			p := internPack(key)
-			mustBeNil(p.externalTest)
-			p.externalTest = pkg
-		case strings.Contains(pkg.ID, ".test]"):
-			p := internPack(pkg.PkgPath)
-			mustBeNil(p.internalTest)
-			p.internalTest = pkg
-		case pkg.Name == "main" && strings.HasSuffix(pkg.PkgPath, ".test"):
-			// Test binary. Skip.
-		case pkg.Name == "":
-			// Empty package. Skip.
-		default:
-			p := internPack(pkg.PkgPath)
-			mustBeNil(p.base)
-			p.base = pkg
-		}
-	}
-
 	result := pkgs[:0]
-	for key, p := range packs {
-		if p.externalTest != nil {
-			result = append(result, p.externalTest)
+	pkgload.VisitUnits(pkgs, func(u *pkgload.Unit) {
+		if u.ExternalTest != nil {
+			result = append(result, u.ExternalTest)
 		}
 
-		switch {
-		case p.internalTest != nil:
+		if u.Test != nil {
 			// Prefer tests to the base package, if present.
-			result = append(result, p.internalTest)
-		case p.base != nil:
-			result = append(result, p.base)
-		default:
-			panic(fmt.Sprintf("empty pack %q", key))
+			result = append(result, u.Test)
+		} else {
+			result = append(result, u.Base)
 		}
-	}
+	})
 	return result, nil
 }
