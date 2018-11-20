@@ -1,3 +1,11 @@
+[![Build Status][travis-image]][travis-url]
+[![Go Report Card][go-report-image]][go-report-url]
+
+[travis-image]: https://travis-ci.org/go-critic/go-critic.svg?branch=master
+[travis-url]: https://travis-ci.org/go-critic/go-critic
+[go-report-image]: https://goreportcard.com/badge/github.com/go-critic/go-critic
+[go-report-url]: https://goreportcard.com/report/github.com/go-critic/go-critic
+
 ## Quick start / Installation / Usage
 
 Install `lintpack`:
