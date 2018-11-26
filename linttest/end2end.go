@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	warningDirectiveRE = regexp.MustCompile(`^\s*/// (.*)`)
+	warningDirectiveRE = regexp.MustCompile(`^\s*/\*! (.*) \*/`)
 	commentRE          = regexp.MustCompile(`^\s*//`)
 )
 
@@ -25,6 +25,8 @@ func (w warning) String() string {
 	return w.text
 }
 
+// TODO(Quasilyte): rename the function and a type.
+// The're not related to a golden file.
 func newGoldenFile(t *testing.T, filename string) *goldenFile {
 	testData, err := ioutil.ReadFile(filename)
 	if err != nil {
@@ -40,11 +42,6 @@ func newGoldenFile(t *testing.T, filename string) *goldenFile {
 			pending = append(pending, &warning{text: m[1]})
 		} else if len(pending) != 0 {
 			line := i + 1
-			if commentRE.MatchString(l) {
-				// Hack to make it possible to attach directives
-				// to a proper single-line comment position.
-				line -= len(pending)
-			}
 			warnings[line] = append([]*warning{}, pending...)
 			pending = pending[:0]
 		}
