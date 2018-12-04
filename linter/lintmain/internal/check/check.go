@@ -35,6 +35,7 @@ func Main() {
 	}{
 		{"load plugin", l.loadPlugin},
 		{"bind checker params", l.bindCheckerParams},
+		{"bind default enabled list", l.bindDefaultEnabledList},
 		{"parse args", l.parseArgs},
 		{"assign checker params", l.assignCheckerParams},
 		{"load program", l.loadProgram},
@@ -68,10 +69,10 @@ type linter struct {
 	checkerParams boundCheckerParams
 
 	filters struct {
-		disableTags *regexp.Regexp
-		disable     *regexp.Regexp
-		enableTags  *regexp.Regexp
-		enable      *regexp.Regexp
+		enableAll       bool
+		enable          []string
+		disable         []string
+		defaultCheckers []string
 	}
 
 	workDir string
@@ -161,42 +162,57 @@ func (l *linter) checkFile(f *ast.File) {
 }
 
 func (l *linter) initCheckers() error {
-	matchAnyTag := func(re *regexp.Regexp, info *lintpack.CheckerInfo) bool {
+	parseKeys := func(keys []string, byName, byTag map[string]bool) {
+		for _, key := range keys {
+			if strings.HasPrefix(key, "#") {
+				byTag[key[len("#"):]] = true
+			} else {
+				byName[key] = true
+			}
+		}
+	}
+
+	enabledByName := make(map[string]bool)
+	enabledTags := make(map[string]bool)
+	parseKeys(l.filters.enable, enabledByName, enabledTags)
+	disabledByName := make(map[string]bool)
+	disabledTags := make(map[string]bool)
+	parseKeys(l.filters.disable, disabledByName, disabledTags)
+
+	enabledByTag := func(info *lintpack.CheckerInfo) bool {
 		for _, tag := range info.Tags {
-			if re.MatchString(tag) {
+			if enabledTags[tag] {
 				return true
 			}
 		}
 		return false
 	}
-	disabledByTags := func(info *lintpack.CheckerInfo) bool {
-		if len(info.Tags) == 0 {
-			return false
+	disabledByTag := func(info *lintpack.CheckerInfo) string {
+		for _, tag := range info.Tags {
+			if disabledTags[tag] {
+				return tag
+			}
 		}
-		return matchAnyTag(l.filters.disableTags, info)
-	}
-	enabledByTags := func(info *lintpack.CheckerInfo) bool {
-		if len(info.Tags) == 0 {
-			return true
-		}
-		return matchAnyTag(l.filters.enableTags, info)
+		return ""
 	}
 
 	for _, info := range l.infoList {
-		enabled := false
+		enabled := l.filters.enableAll ||
+			enabledByName[info.Name] ||
+			enabledByTag(info)
 		notice := ""
 
 		switch {
-		case !l.filters.enable.MatchString(info.Name):
-			notice = "not enabled by name (-enable)"
-		case !enabledByTags(info):
-			notice = "not enabled by tags (-enableTags)"
-		case l.filters.disable.MatchString(info.Name):
+		case !enabled:
+			notice = "not enabled by name or tag (-enable)"
+		case disabledByName[info.Name]:
+			enabled = false
 			notice = "disabled by name (-disable)"
-		case disabledByTags(info):
-			notice = "disabled by tags (-disableTags)"
 		default:
-			enabled = true
+			if tag := disabledByTag(info); tag != "" {
+				enabled = false
+				notice = fmt.Sprintf("disabled by %q tag (-disable)", tag)
+			}
 		}
 
 		if l.verbose && !enabled {
@@ -293,15 +309,28 @@ func (l *linter) checkerParamKey(info *lintpack.CheckerInfo, pname string) strin
 	return "@" + info.Name + "." + pname
 }
 
+// bindDefaultEnabledList calculates the default value for -enable param.
+func (l *linter) bindDefaultEnabledList() error {
+	var enabled []string
+	for _, info := range l.infoList {
+		enable := !info.HasTag("experimental") &&
+			!info.HasTag("opinionated") &&
+			!info.HasTag("performance")
+		if enable {
+			enabled = append(enabled, info.Name)
+		}
+	}
+	l.filters.defaultCheckers = enabled
+	return nil
+}
+
 func (l *linter) parseArgs() error {
-	disableTags := flag.String("disableTags", `^experimental$|^performance$|^opinionated$`,
-		`regexp that excludes checkers that have matching tag`)
-	disable := flag.String("disable", `<none>`,
-		`regexp that disables unwanted checks`)
-	enableTags := flag.String("enableTags", `.*`,
-		`regexp that includes checkers that have matching tag`)
-	enable := flag.String("enable", `.*`,
-		`regexp that selects what checkers are being run. Applied after all other filters`)
+	flag.BoolVar(&l.filters.enableAll, "enableAll", false,
+		`identical to -enable with all checkers listed. If true, -enable is ignored`)
+	enable := flag.String("enable", strings.Join(l.filters.defaultCheckers, ","),
+		`comma-separated list of enabled checkers. Can include #tags`)
+	disable := flag.String("disable", "",
+		`comma-separated list of checkers to be disabled. Can include #tags`)
 	flag.IntVar(&l.exitCode, "exitCode", 1,
 		`exit code to be used when lint issues are found`)
 	flag.BoolVar(&l.checkTests, "checkTests", true,
@@ -315,25 +344,9 @@ func (l *linter) parseArgs() error {
 
 	flag.Parse()
 
-	var err error
-
 	l.packages = flag.Args()
-	l.filters.disableTags, err = regexp.Compile(*disableTags)
-	if err != nil {
-		return fmt.Errorf("-disableTags: %v", err)
-	}
-	l.filters.disable, err = regexp.Compile(*disable)
-	if err != nil {
-		return fmt.Errorf("-disable: %v", err)
-	}
-	l.filters.enableTags, err = regexp.Compile(*enableTags)
-	if err != nil {
-		return fmt.Errorf("-enableTags: %v", err)
-	}
-	l.filters.enable, err = regexp.Compile(*enable)
-	if err != nil {
-		return fmt.Errorf("-enable: %v", err)
-	}
+	l.filters.enable = strings.Split(*enable, ",")
+	l.filters.disable = strings.Split(*disable, ",")
 
 	if l.shorterErrLocation {
 		wd, err := os.Getwd()
