@@ -7,20 +7,24 @@ import (
 	"github.com/go-lintpack/lintpack"
 )
 
-// checkersFromDylib loads checkers provided by a dynamic lybrary found under path.
-func checkersFromDylib(path string) error {
+// CheckersFromDylib loads checkers provided by a dynamic lybrary found under path.
+//
+// The returned info slice must be re-assigned to the original info slice,
+// since there will be new entries there.
+func CheckersFromDylib(infoList []*lintpack.CheckerInfo, path string) ([]*lintpack.CheckerInfo, error) {
 	if path == "" {
-		return nil // Nothing to do
+		return infoList, nil // Nothing to do
 	}
-	checkersBefore := len(lintpack.GetCheckersInfo())
+	checkersBefore := len(infoList)
 	// Open plugin only for side-effects (init functions).
 	_, err := plugin.Open(path)
 	if err != nil {
-		return err
+		return infoList, err
 	}
-	checkersAfter := len(lintpack.GetCheckersInfo())
+	maybeUpdatedList := lintpack.GetCheckersInfo()
+	checkersAfter := len(maybeUpdatedList)
 	if checkersBefore == checkersAfter {
-		return fmt.Errorf("loaded plugin doesn't provide any lintpack-compatible checkers")
+		return infoList, fmt.Errorf("loaded plugin doesn't provide any lintpack-compatible checkers")
 	}
-	return nil
+	return maybeUpdatedList, nil
 }

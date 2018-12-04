@@ -6,19 +6,20 @@ import (
 	"fmt"
 	"go/ast"
 	"go/build"
-	"go/parser"
+	"go/token"
 	"go/types"
 	"log"
 	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 
 	"github.com/go-lintpack/lintpack"
 	"github.com/logrusorgru/aurora"
-	"golang.org/x/tools/go/loader"
+	"golang.org/x/tools/go/packages"
 )
 
 // checkMain implements sub-command entry point.
@@ -30,11 +31,12 @@ func checkMain() {
 		name string
 		fn   func() error
 	}{
+		{"load plugin", l.loadPlugin},
 		{"bind checker params", l.bindCheckerParams},
+		{"bind default enabled list", l.bindDefaultEnabledList},
 		{"parse args", l.parseArgs},
 		{"assign checker params", l.assignCheckerParams},
 		{"load program", l.loadProgram},
-		{"load plugin", l.loadPlugin},
 		{"init checkers", l.initCheckers},
 		{"run checkers", l.runCheckers},
 		{"exit if found issues", l.exit},
@@ -50,7 +52,9 @@ func checkMain() {
 type linter struct {
 	ctx *lintpack.Context
 
-	prog *loader.Program
+	fset *token.FileSet
+
+	loadedPackages []*packages.Package
 
 	infoList []*lintpack.CheckerInfo
 
@@ -63,13 +67,13 @@ type linter struct {
 	checkerParams boundCheckerParams
 
 	filters struct {
-		disableTags *regexp.Regexp
-		disable     *regexp.Regexp
-		enableTags  *regexp.Regexp
-		enable      *regexp.Regexp
+		enableAll       bool
+		enable          []string
+		disable         []string
+		defaultCheckers []string
 	}
 
-	pluginPath string
+	workDir string
 
 	exitCode           int
 	checkTests         bool
@@ -87,30 +91,16 @@ func (l *linter) exit() error {
 }
 
 func (l *linter) runCheckers() error {
-	pkgInfoMap := make(map[string]*loader.PackageInfo)
-	for _, pkgInfo := range l.prog.AllPackages {
-		pkgInfoMap[pkgInfo.Pkg.Path()] = pkgInfo
-	}
-	for _, pkgPath := range l.packages {
-		pkgInfo := pkgInfoMap[pkgPath]
-		if pkgInfo == nil || !pkgInfo.TransitivelyErrorFree {
-			log.Fatalf("%s package is not properly loaded", pkgPath)
-		}
-		// Check the package itself.
-		l.checkPackage(pkgInfo)
-		// Check package external test (if any).
-		pkgInfo = pkgInfoMap[pkgPath+"_test"]
-		if pkgInfo != nil {
-			l.checkPackage(pkgInfo)
-		}
+	for _, pkg := range l.loadedPackages {
+		l.checkPackage(pkg)
 	}
 
 	return nil
 }
 
-func (l *linter) checkPackage(pkgInfo *loader.PackageInfo) {
-	l.ctx.SetPackageInfo(&pkgInfo.Info, pkgInfo.Pkg)
-	for _, f := range pkgInfo.Files {
+func (l *linter) checkPackage(pkg *packages.Package) {
+	l.ctx.SetPackageInfo(pkg.TypesInfo, pkg.Types)
+	for _, f := range pkg.Syntax {
 		filename := l.getFilename(f)
 		if !l.checkTests && strings.HasSuffix(filename, "_test.go") {
 			continue
@@ -124,12 +114,14 @@ func (l *linter) checkPackage(pkgInfo *loader.PackageInfo) {
 }
 
 func (l *linter) checkFile(f *ast.File) {
+	warnings := make([][]lintpack.Warning, len(l.checkers))
+
 	var wg sync.WaitGroup
 	wg.Add(len(l.checkers))
-	for _, c := range l.checkers {
+	for i, c := range l.checkers {
 		// All checkers are expected to use *lint.Context
 		// as read-only structure, so no copying is required.
-		go func(c *lintpack.Checker) {
+		go func(i int, c *lintpack.Checker) {
 			defer func() {
 				wg.Done()
 				// Checker signals unexpected error with panic(error).
@@ -148,64 +140,84 @@ func (l *linter) checkFile(f *ast.File) {
 			}()
 
 			for _, warn := range c.Check(f) {
-				l.foundIssues = true
-				loc := l.ctx.FileSet.Position(warn.Node.Pos()).String()
-				if l.shorterErrLocation {
-					loc = shortenLocation(loc)
-				}
-
-				printWarning(l, c.Info.Name, loc, warn.Text)
+				warnings[i] = append(warnings[i], warn)
 			}
-		}(c)
+		}(i, c)
 	}
 	wg.Wait()
+
+	for i, c := range l.checkers {
+		for _, warn := range warnings[i] {
+			l.foundIssues = true
+			loc := l.ctx.FileSet.Position(warn.Node.Pos()).String()
+			if l.shorterErrLocation {
+				loc = l.shortenLocation(loc)
+			}
+			printWarning(l, c.Info.Name, loc, warn.Text)
+		}
+	}
+
 }
 
 func (l *linter) initCheckers() error {
-	matchAnyTag := func(re *regexp.Regexp, info *lintpack.CheckerInfo) bool {
+	parseKeys := func(keys []string, byName, byTag map[string]bool) {
+		for _, key := range keys {
+			if strings.HasPrefix(key, "#") {
+				byTag[key[len("#"):]] = true
+			} else {
+				byName[key] = true
+			}
+		}
+	}
+
+	enabledByName := make(map[string]bool)
+	enabledTags := make(map[string]bool)
+	parseKeys(l.filters.enable, enabledByName, enabledTags)
+	disabledByName := make(map[string]bool)
+	disabledTags := make(map[string]bool)
+	parseKeys(l.filters.disable, disabledByName, disabledTags)
+
+	enabledByTag := func(info *lintpack.CheckerInfo) bool {
 		for _, tag := range info.Tags {
-			if re.MatchString(tag) {
+			if enabledTags[tag] {
 				return true
 			}
 		}
 		return false
 	}
-	disabledByTags := func(info *lintpack.CheckerInfo) bool {
-		if len(info.Tags) == 0 {
-			return false
+	disabledByTag := func(info *lintpack.CheckerInfo) string {
+		for _, tag := range info.Tags {
+			if disabledTags[tag] {
+				return tag
+			}
 		}
-		return matchAnyTag(l.filters.disableTags, info)
-	}
-	enabledByTags := func(info *lintpack.CheckerInfo) bool {
-		if len(info.Tags) == 0 {
-			return true
-		}
-		return matchAnyTag(l.filters.enableTags, info)
+		return ""
 	}
 
 	for _, info := range l.infoList {
-		enabled := false
+		enabled := l.filters.enableAll ||
+			enabledByName[info.Name] ||
+			enabledByTag(info)
 		notice := ""
 
 		switch {
-		case !l.filters.enable.MatchString(info.Name):
-			notice = "not enabled by name (-enable)"
-		case !enabledByTags(info):
-			notice = "not enabled by tags (-enableTags)"
-		case l.filters.disable.MatchString(info.Name):
+		case !enabled:
+			notice = "not enabled by name or tag (-enable)"
+		case disabledByName[info.Name]:
+			enabled = false
 			notice = "disabled by name (-disable)"
-		case disabledByTags(info):
-			notice = "disabled by tags (-disableTags)"
 		default:
-			enabled = true
+			if tag := disabledByTag(info); tag != "" {
+				enabled = false
+				notice = fmt.Sprintf("disabled by %q tag (-disable)", tag)
+			}
 		}
 
 		if l.verbose && !enabled {
 			log.Printf("\tdebug: %s: %s", info.Name, notice)
 		}
 		if enabled {
-			// TODO(Quasilyte): use non-nil params. See #6.
-			l.checkers = append(l.checkers, lintpack.NewChecker(l.ctx, info, nil))
+			l.checkers = append(l.checkers, lintpack.NewChecker(l.ctx, info))
 		}
 	}
 	if l.verbose {
@@ -226,29 +238,34 @@ func (l *linter) loadProgram() error {
 		return fmt.Errorf("can't find sizes info for %s", runtime.GOARCH)
 	}
 
-	conf := loader.Config{
-		ParserMode: parser.ParseComments,
-		TypeChecker: types.Config{
-			Sizes: sizes,
-		},
+	l.fset = token.NewFileSet()
+	cfg := packages.Config{
+		Mode:  packages.LoadSyntax,
+		Tests: true,
+		Fset:  l.fset,
 	}
-
-	if _, err := conf.FromArgs(l.packages, true); err != nil {
-		log.Fatalf("resolve packages: %v", err)
-	}
-	prog, err := conf.Load()
+	pkgs, err := loadPackages(&cfg, l.packages)
 	if err != nil {
-		log.Fatalf("load program: %v", err)
+		log.Fatalf("load packages: %v", err)
 	}
+	sort.SliceStable(pkgs, func(i, j int) bool {
+		return pkgs[i].PkgPath < pkgs[j].PkgPath
+	})
 
-	l.prog = prog
-	l.ctx = lintpack.NewContext(prog.Fset, sizes)
+	l.loadedPackages = pkgs
+	l.ctx = lintpack.NewContext(l.fset, sizes)
 
 	return nil
 }
 
 func (l *linter) loadPlugin() error {
-	return checkersFromDylib(l.pluginPath)
+	const pluginFilename = "lintpack-plugin.so"
+	if _, err := os.Stat(pluginFilename); os.IsNotExist(err) {
+		return nil
+	}
+	infoList, err := CheckersFromDylib(l.infoList, pluginFilename)
+	l.infoList = infoList
+	return err
 }
 
 type boundCheckerParams struct {
@@ -290,17 +307,28 @@ func (l *linter) checkerParamKey(info *lintpack.CheckerInfo, pname string) strin
 	return "@" + info.Name + "." + pname
 }
 
+// bindDefaultEnabledList calculates the default value for -enable param.
+func (l *linter) bindDefaultEnabledList() error {
+	var enabled []string
+	for _, info := range l.infoList {
+		enable := !info.HasTag("experimental") &&
+			!info.HasTag("opinionated") &&
+			!info.HasTag("performance")
+		if enable {
+			enabled = append(enabled, info.Name)
+		}
+	}
+	l.filters.defaultCheckers = enabled
+	return nil
+}
+
 func (l *linter) parseArgs() error {
-	flag.StringVar(&l.pluginPath, "pluginPath", "",
-		`path to a Go plugin that provides additional checks`)
-	disableTags := flag.String("disableTags", `^experimental$|^performance$|^opinionated$`,
-		`regexp that excludes checkers that have matching tag`)
-	disable := flag.String("disable", `<none>`,
-		`regexp that disables unwanted checks`)
-	enableTags := flag.String("enableTags", `.*`,
-		`regexp that includes checkers that have matching tag`)
-	enable := flag.String("enable", `.*`,
-		`regexp that selects what checkers are being run. Applied after all other filters`)
+	flag.BoolVar(&l.filters.enableAll, "enableAll", false,
+		`identical to -enable with all checkers listed. If true, -enable is ignored`)
+	enable := flag.String("enable", strings.Join(l.filters.defaultCheckers, ","),
+		`comma-separated list of enabled checkers. Can include #tags`)
+	disable := flag.String("disable", "",
+		`comma-separated list of checkers to be disabled. Can include #tags`)
 	flag.IntVar(&l.exitCode, "exitCode", 1,
 		`exit code to be used when lint issues are found`)
 	flag.BoolVar(&l.checkTests, "checkTests", true,
@@ -314,24 +342,16 @@ func (l *linter) parseArgs() error {
 
 	flag.Parse()
 
-	var err error
-
 	l.packages = flag.Args()
-	l.filters.disableTags, err = regexp.Compile(*disableTags)
-	if err != nil {
-		return fmt.Errorf("-disableTags: %v", err)
-	}
-	l.filters.disable, err = regexp.Compile(*disable)
-	if err != nil {
-		return fmt.Errorf("-disable: %v", err)
-	}
-	l.filters.enableTags, err = regexp.Compile(*enableTags)
-	if err != nil {
-		return fmt.Errorf("-enableTags: %v", err)
-	}
-	l.filters.enable, err = regexp.Compile(*enable)
-	if err != nil {
-		return fmt.Errorf("-enable: %v", err)
+	l.filters.enable = strings.Split(*enable, ",")
+	l.filters.disable = strings.Split(*disable, ",")
+
+	if l.shorterErrLocation {
+		wd, err := os.Getwd()
+		if err != nil {
+			log.Printf("getwd: %v", err)
+		}
+		l.workDir = wd
 	}
 
 	return nil
@@ -372,18 +392,28 @@ func (l *linter) isGenerated(f *ast.File) bool {
 
 func (l *linter) getFilename(f *ast.File) string {
 	// See https://github.com/golang/go/issues/24498.
-	return filepath.Base(l.prog.Fset.Position(f.Pos()).Filename)
+	return filepath.Base(l.fset.Position(f.Pos()).Filename)
 }
 
-func shortenLocation(loc string) string {
+func (l *linter) shortenLocation(loc string) string {
+	// If possible, construct relative path.
+	relLoc := loc
+	if l.workDir != "" {
+		relLoc = strings.Replace(loc, l.workDir, ".", 1)
+	}
+
 	switch {
 	case strings.HasPrefix(loc, build.Default.GOPATH):
-		return strings.Replace(loc, build.Default.GOPATH, "$GOPATH", 1)
+		loc = strings.Replace(loc, build.Default.GOPATH, "$GOPATH", 1)
 	case strings.HasPrefix(loc, build.Default.GOROOT):
-		return strings.Replace(loc, build.Default.GOROOT, "$GOROOT", 1)
-	default:
-		return loc
+		loc = strings.Replace(loc, build.Default.GOROOT, "$GOROOT", 1)
 	}
+
+	// Return the representation that is shorter.
+	if len(relLoc) < len(loc) {
+		return relLoc
+	}
+	return loc
 }
 
 func printWarning(l *linter, rule, loc, warn string) {
@@ -397,4 +427,26 @@ func printWarning(l *linter, rule, loc, warn string) {
 	default:
 		log.Printf("%s: %s: %s\n", loc, rule, warn)
 	}
+}
+
+func loadPackages(cfg *packages.Config, patterns []string) ([]*packages.Package, error) {
+	pkgs, err := packages.Load(cfg, patterns...)
+	if err != nil {
+		return nil, err
+	}
+
+	result := pkgs[:0]
+	pkgload.VisitUnits(pkgs, func(u *pkgload.Unit) {
+		if u.ExternalTest != nil {
+			result = append(result, u.ExternalTest)
+		}
+
+		if u.Test != nil {
+			// Prefer tests to the base package, if present.
+			result = append(result, u.Test)
+		} else {
+			result = append(result, u.Base)
+		}
+	})
+	return result, nil
 }
