@@ -2,6 +2,7 @@ package lintpack
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -46,24 +47,24 @@ func addChecker(info *CheckerInfo, constructor func(*CheckerContext) FileWalker)
 		}
 	}
 
-	trimDocumentation := func(d *CheckerInfo) {
+	trimDocumentation := func(info *CheckerInfo) {
 		fields := []*string{
-			&d.Summary,
-			&d.Details,
-			&d.Before,
-			&d.After,
-			&d.Note,
+			&info.Summary,
+			&info.Details,
+			&info.Before,
+			&info.After,
+			&info.Note,
 		}
 		for _, f := range fields {
 			*f = strings.TrimSpace(*f)
 		}
 	}
-	validateDocumentation := func(d *CheckerInfo) {
-		// TODO(Quasilyte): validate documentation.
-	}
 
 	trimDocumentation(info)
-	validateDocumentation(info)
+
+	if err := validateCheckerInfo(info); err != nil {
+		panic(err)
+	}
 
 	proto := checkerProto{
 		info: info,
@@ -88,4 +89,47 @@ func newChecker(ctx *Context, info *CheckerInfo) *Checker {
 		panic(fmt.Sprintf("checker with name %q not registered", info.Name))
 	}
 	return proto.constructor(ctx)
+}
+
+func validateCheckerInfo(info *CheckerInfo) error {
+	steps := []func(*CheckerInfo) error{
+		validateCheckerName,
+		validateCheckerDocumentation,
+		validateCheckerTags,
+	}
+
+	for _, step := range steps {
+		if err := step(info); err != nil {
+			return fmt.Errorf("%q validation error: %v", info.Name, err)
+		}
+	}
+	return nil
+}
+
+var validIdentRE = regexp.MustCompile(`^\w+$`)
+
+func validateCheckerName(info *CheckerInfo) error {
+	if !validIdentRE.MatchString(info.Name) {
+		return fmt.Errorf("checker name contains illegal chars")
+	}
+	return nil
+}
+
+func validateCheckerDocumentation(info *CheckerInfo) error {
+	// TODO(Quasilyte): validate documentation.
+	return nil
+}
+
+func validateCheckerTags(info *CheckerInfo) error {
+	tagSet := make(map[string]bool)
+	for _, tag := range info.Tags {
+		if tagSet[tag] {
+			return fmt.Errorf("duplicated tag %q", tag)
+		}
+		if !validIdentRE.MatchString(tag) {
+			return fmt.Errorf("checker tag %q contains illegal chars", tag)
+		}
+		tagSet[tag] = true
+	}
+	return nil
 }
