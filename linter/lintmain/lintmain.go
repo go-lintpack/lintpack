@@ -38,8 +38,8 @@ func Run(cfg Config) {
 			Short: "run linter over specified targets",
 			Examples: makeExamples(
 				"%s check -help",
-				"%s check -disableTags=none strings bytes",
-				"%s check -enableTags=diagnostic ./...",
+				"%s check -enable='paramTypeCombine,unslice' strings bytes",
+				"%s check -v -enable='#diagnostic' -disable='#experimental,#opinionated' ./...",
 			),
 		},
 		{
