@@ -18,6 +18,7 @@ import (
 	"sync"
 
 	"github.com/go-lintpack/lintpack"
+	"github.com/go-toolsmith/pkgload"
 	"github.com/logrusorgru/aurora"
 	"golang.org/x/tools/go/packages"
 )
