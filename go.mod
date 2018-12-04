@@ -1,7 +1,5 @@
 module github.com/go-lintpack/lintpack
 
-go 1.12
-
 require (
 	github.com/go-toolsmith/astequal v0.0.0-20180903214952-dcb477bfacd6
 	github.com/go-toolsmith/astfmt v0.0.0-20180903215011-8f8ee99c3086

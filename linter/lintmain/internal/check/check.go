@@ -33,12 +33,12 @@ func Main() {
 		name string
 		fn   func() error
 	}{
+		{"load plugin", l.loadPlugin},
 		{"bind checker params", l.bindCheckerParams},
 		{"bind default enabled list", l.bindDefaultEnabledList},
 		{"parse args", l.parseArgs},
 		{"assign checker params", l.assignCheckerParams},
 		{"load program", l.loadProgram},
-		{"load plugin", l.loadPlugin},
 		{"init checkers", l.initCheckers},
 		{"run checkers", l.runCheckers},
 		{"exit if found issues", l.exit},
@@ -74,8 +74,6 @@ type linter struct {
 		disable         []string
 		defaultCheckers []string
 	}
-
-	pluginPath string
 
 	workDir string
 
@@ -263,7 +261,11 @@ func (l *linter) loadProgram() error {
 }
 
 func (l *linter) loadPlugin() error {
-	infoList, err := hotload.CheckersFromDylib(l.infoList, l.pluginPath)
+	const pluginFilename = "lintpack-plugin.so"
+	if _, err := os.Stat(pluginFilename); os.IsNotExist(err) {
+		return nil
+	}
+	infoList, err := hotload.CheckersFromDylib(l.infoList, pluginFilename)
 	l.infoList = infoList
 	return err
 }
@@ -323,8 +325,6 @@ func (l *linter) bindDefaultEnabledList() error {
 }
 
 func (l *linter) parseArgs() error {
-	flag.StringVar(&l.pluginPath, "pluginPath", "",
-		`path to a Go plugin that provides additional checks`)
 	flag.BoolVar(&l.filters.enableAll, "enableAll", false,
 		`identical to -enable with all checkers listed. If true, -enable is ignored`)
 	enable := flag.String("enable", strings.Join(l.filters.defaultCheckers, ","),
