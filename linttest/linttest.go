@@ -22,7 +22,7 @@ func saneCheckersList(t *testing.T) []*lintpack.CheckerInfo {
 
 	for _, info := range lintpack.GetCheckersInfo() {
 		pkgPath := "github.com/go-lintpack/lintpack/linttest/testdata/sanity"
-		t.Run("sanity/"+info.Name, func(t *testing.T) {
+		t.Run(info.Name+"/sanity", func(t *testing.T) {
 			fset := token.NewFileSet()
 			pkgs := newPackages(t, pkgPath, fset)
 			for _, pkg := range pkgs {
