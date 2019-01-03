@@ -94,6 +94,10 @@ func (l *linter) exit() error {
 
 func (l *linter) runCheckers() error {
 	for _, pkg := range l.loadedPackages {
+		if l.verbose {
+			log.Printf("\tdebug: checking %q package (%d files)",
+				pkg.String(), len(pkg.Syntax))
+		}
 		l.checkPackage(pkg)
 	}
 
