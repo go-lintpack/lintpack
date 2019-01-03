@@ -93,7 +93,12 @@ func (cfg *IntegrationTest) runTest(t *testing.T, linter, gopath string) {
 		// Get the actual execution output.
 		cmd := exec.Command(linter, runParams...)
 		cmd.Env = append([]string{}, os.Environ()...) // Copy parent env
-		cmd.Env = append(cmd.Env, "GOPATH="+gopath)   // Override GOPATH
+		cmd.Env = append(cmd.Env,
+			// Override GOPATH.
+			"GOPATH="+gopath,
+			// Disable modules. See #62.
+			"GO111MODULE=off")
+
 		out, err := cmd.CombinedOutput()
 		out = bytes.TrimSpace(out)
 		var have string
