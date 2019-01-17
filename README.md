@@ -18,9 +18,9 @@ Install checkers from [go-critic/checkers](https://github.com/go-critic/checkers
 
 ```bash
 # You'll need to have sources under your Go workspace first:
-go get -v -u github.com/go-critic/checkers
+go get -v -u github.com/go-critic/go-critic/...
 # Now build a linter that includes all checks from that package:
-lintpack build -o gocritic github.com/go-critic/checkers
+lintpack build -o gocritic github.com/go-critic/go-critic/checkers
 # Executable gocritic is created and can be used as a standalone linter.
 ```
 
