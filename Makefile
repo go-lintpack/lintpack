@@ -1,5 +1,7 @@
 .PHONY: test ci
 
+export GO111MODULE := on
+
 %:      # stubs to get makefile param for `test-checker` command
 	@:	# see: https://stackoverflow.com/a/6273809/433041
 
