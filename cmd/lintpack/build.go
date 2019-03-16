@@ -19,6 +19,9 @@ func lintpackBuild() {
 
 	defer func() {
 		if p.main != nil {
+			if err := p.main.Close(); err != nil {
+				return // We tried
+			}
 			if err := os.Remove(p.main.Name()); err != nil {
 				log.Printf("cleanup failed: %v", err)
 			}
