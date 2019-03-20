@@ -21,7 +21,7 @@ var subCommands = []*cmdutil.SubCommand{
 		Short: "build linter from made of lintpack-compatible packages",
 		Examples: []string{
 			"lintpack build -help",
-			"lintpack build -o gocritic github.com/go-critic/checkers",
+			"lintpack build -o gocritic github.com/go-critic/go-critic/checkers",
 			"lintpack build -linter.version=v1.0.0 .",
 		},
 	},
