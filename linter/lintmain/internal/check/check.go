@@ -76,6 +76,8 @@ type linter struct {
 	}
 
 	workDir string
+	gopath  string
+	goroot  string
 
 	exitCode           int
 	checkTests         bool
@@ -357,10 +359,19 @@ func (l *linter) parseArgs() error {
 		if err != nil {
 			log.Printf("getwd: %v", err)
 		}
-		l.workDir = wd
+		l.workDir = addTrailingSlash(wd)
+		l.gopath = addTrailingSlash(build.Default.GOPATH)
+		l.goroot = addTrailingSlash(build.Default.GOROOT)
 	}
 
 	return nil
+}
+
+func addTrailingSlash(s string) string {
+	if strings.HasSuffix(s, string(os.PathSeparator)) {
+		return s
+	}
+	return s + string(os.PathSeparator)
 }
 
 // assignCheckerParams initializes checker parameter values using
@@ -405,14 +416,14 @@ func (l *linter) shortenLocation(loc string) string {
 	// If possible, construct relative path.
 	relLoc := loc
 	if l.workDir != "" {
-		relLoc = strings.Replace(loc, l.workDir, ".", 1)
+		relLoc = strings.Replace(loc, l.workDir, "./", 1)
 	}
 
 	switch {
-	case strings.HasPrefix(loc, build.Default.GOPATH):
-		loc = strings.Replace(loc, build.Default.GOPATH, "$GOPATH", 1)
-	case strings.HasPrefix(loc, build.Default.GOROOT):
-		loc = strings.Replace(loc, build.Default.GOROOT, "$GOROOT", 1)
+	case strings.HasPrefix(loc, l.gopath):
+		loc = strings.Replace(loc, l.gopath, "$GOPATH"+string(os.PathSeparator), 1)
+	case strings.HasPrefix(loc, l.goroot):
+		loc = strings.Replace(loc, l.goroot, "$GOROOT"+string(os.PathSeparator), 1)
 	}
 
 	// Return the representation that is shorter.
