@@ -21,6 +21,8 @@ func TestShortenLocation(t *testing.T) {
 		{"/home/queen/go/src/", "/home/queen/go/src/file.go", "./file.go"},
 		{"/home/queen/", "/home/queen-src-file.go", "/home/queen-src-file.go"},
 		{"/home/", "/home/queen/go/src/file.go", "$GOPATH/src/file.go"},
+
+		{`C:\home\queen\go\src\`, `C:\home\queen\go\src\file.go`, "./file.go"},
 	}
 
 	l := &linter{

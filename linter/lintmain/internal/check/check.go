@@ -368,10 +368,10 @@ func (l *linter) parseArgs() error {
 }
 
 func addTrailingSlash(s string) string {
-	if strings.HasSuffix(s, "/") {
+	if strings.HasSuffix(s, string(os.PathSeparator)) {
 		return s
 	}
-	return s + "/"
+	return s + string(os.PathSeparator)
 }
 
 // assignCheckerParams initializes checker parameter values using
@@ -421,9 +421,9 @@ func (l *linter) shortenLocation(loc string) string {
 
 	switch {
 	case strings.HasPrefix(loc, l.gopath):
-		loc = strings.Replace(loc, l.gopath, "$GOPATH/", 1)
+		loc = strings.Replace(loc, l.gopath, "$GOPATH"+string(os.PathSeparator), 1)
 	case strings.HasPrefix(loc, l.goroot):
-		loc = strings.Replace(loc, l.goroot, "$GOROOT/", 1)
+		loc = strings.Replace(loc, l.goroot, "$GOROOT"+string(os.PathSeparator), 1)
 	}
 
 	// Return the representation that is shorter.
