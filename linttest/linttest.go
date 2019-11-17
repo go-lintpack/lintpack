@@ -95,7 +95,7 @@ func checkFiles(t *testing.T, c *lintpack.Checker, ctx *lintpack.Context, pkg *p
 	for _, f := range pkg.Syntax {
 		filename := getFilename(ctx.FileSet, f)
 		testFilename := filepath.Join("testdata", c.Info.Name, filename)
-		goldenWarns := newGoldenFile(t, testFilename)
+		ws := newWarnings(t, testFilename)
 
 		stripDirectives(f)
 		ctx.SetFileInfo(filename, f)
@@ -103,7 +103,7 @@ func checkFiles(t *testing.T, c *lintpack.Checker, ctx *lintpack.Context, pkg *p
 		for _, warn := range c.Check(f) {
 			line := ctx.FileSet.Position(warn.Node.Pos()).Line
 
-			if w := goldenWarns.find(line, warn.Text); w != nil {
+			if w := ws.find(line, warn.Text); w != nil {
 				if w.matched {
 					t.Errorf("%s:%d: multiple matches for %s",
 						testFilename, line, w)
@@ -115,7 +115,7 @@ func checkFiles(t *testing.T, c *lintpack.Checker, ctx *lintpack.Context, pkg *p
 			}
 		}
 
-		goldenWarns.checkUnmatched(t, testFilename)
+		ws.checkUnmatched(t, testFilename)
 	}
 }
 

@@ -12,8 +12,8 @@ var (
 	commentRE          = regexp.MustCompile(`^\s*//`)
 )
 
-type goldenFile struct {
-	warnings map[int][]*warning
+type warnings struct {
+	byLine map[int][]*warning
 }
 
 type warning struct {
@@ -25,16 +25,14 @@ func (w warning) String() string {
 	return w.text
 }
 
-// TODO(Quasilyte): rename the function and a type.
-// The're not related to a golden file.
-func newGoldenFile(t *testing.T, filename string) *goldenFile {
+func newWarnings(t *testing.T, filename string) *warnings {
 	testData, err := ioutil.ReadFile(filename)
 	if err != nil {
 		t.Fatalf("can't find checker tests: %v", err)
 	}
 	lines := strings.Split(string(testData), "\n")
 
-	warnings := make(map[int][]*warning)
+	ws := make(map[int][]*warning)
 	var pending []*warning
 
 	for i, l := range lines {
@@ -42,15 +40,15 @@ func newGoldenFile(t *testing.T, filename string) *goldenFile {
 			pending = append(pending, &warning{text: m[1]})
 		} else if len(pending) != 0 {
 			line := i + 1
-			warnings[line] = append([]*warning{}, pending...)
+			ws[line] = append([]*warning{}, pending...)
 			pending = pending[:0]
 		}
 	}
-	return &goldenFile{warnings: warnings}
+	return &warnings{byLine: ws}
 }
 
-func (f *goldenFile) find(line int, text string) *warning {
-	for _, y := range f.warnings[line] {
+func (ws *warnings) find(line int, text string) *warning {
+	for _, y := range ws.byLine[line] {
 		if text == y.text {
 			return y
 		}
@@ -58,9 +56,9 @@ func (f *goldenFile) find(line int, text string) *warning {
 	return nil
 }
 
-func (f *goldenFile) checkUnmatched(t *testing.T, testFilename string) {
-	for line := range f.warnings {
-		for _, w := range f.warnings[line] {
+func (ws *warnings) checkUnmatched(t *testing.T, testFilename string) {
+	for line := range ws.byLine {
+		for _, w := range ws.byLine[line] {
 			if w.matched {
 				continue
 			}
