@@ -15,16 +15,8 @@ var (
 )
 
 type warnings struct {
-	byLine  map[int][]*warning
-	matched map[*warning]struct{}
-}
-
-type warning struct {
-	text string
-}
-
-func (w warning) String() string {
-	return w.text
+	byLine  map[int][]string
+	matched map[*string]struct{}
 }
 
 func newWarnings(r io.Reader) (*warnings, error) {
@@ -34,12 +26,12 @@ func newWarnings(r io.Reader) (*warnings, error) {
 	}
 	lines := strings.Split(string(b), "\n")
 
-	ws := make(map[int][]*warning)
-	var pending []*warning
+	ws := make(map[int][]string)
+	var pending []string
 
 	for i, l := range lines {
 		if m := warningDirectiveRE.FindStringSubmatch(l); m != nil {
-			pending = append(pending, &warning{text: m[1]})
+			pending = append(pending, m[1])
 		} else if len(pending) != 0 {
 			line := i + 1
 			ws[line] = pending
@@ -48,14 +40,14 @@ func newWarnings(r io.Reader) (*warnings, error) {
 	}
 	return &warnings{
 		byLine:  ws,
-		matched: make(map[*warning]struct{}),
+		matched: make(map[*string]struct{}),
 	}, nil
 }
 
-func (ws *warnings) find(line int, text string) *warning {
+func (ws *warnings) find(line int, text string) *string {
 	for _, w := range ws.byLine[line] {
-		if text == w.text {
-			return w
+		if text == w {
+			return &w
 		}
 	}
 	return nil
@@ -63,8 +55,8 @@ func (ws *warnings) find(line int, text string) *warning {
 
 func (ws *warnings) checkUnmatched(t *testing.T, testFilename string) {
 	for line, sl := range ws.byLine {
-		for _, w := range sl {
-			if _, ok := ws.matched[w]; !ok {
+		for i, w := range sl {
+			if _, ok := ws.matched[&sl[i]]; !ok {
 				t.Errorf("%s:%d: unmatched `%s`", testFilename, line, w)
 			}
 		}

@@ -120,7 +120,7 @@ func checkFiles(t *testing.T, c *lintpack.Checker, ctx *lintpack.Context, pkg *p
 			if w := ws.find(line, warn.Text); w != nil {
 				if _, seen := ws.matched[w]; seen {
 					t.Errorf("%s:%d: multiple matches for %s",
-						testFilename, line, w)
+						testFilename, line, *w)
 				}
 				ws.matched[w] = struct{}{}
 			} else {
