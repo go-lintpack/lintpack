@@ -42,8 +42,8 @@ func newWarnings(r io.Reader) (*warnings, error) {
 			pending = append(pending, &warning{text: m[1]})
 		} else if len(pending) != 0 {
 			line := i + 1
-			ws[line] = append([]*warning{}, pending...)
-			pending = pending[:0]
+			ws[line] = pending
+			pending = nil
 		}
 	}
 	return &warnings{byLine: ws}, nil
