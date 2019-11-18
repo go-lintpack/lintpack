@@ -15,8 +15,7 @@ var (
 )
 
 type warnings struct {
-	byLine  map[int][]string
-	matched map[*string]struct{}
+	byLine map[int][]string
 }
 
 func newWarnings(r io.Reader) (*warnings, error) {
@@ -39,8 +38,7 @@ func newWarnings(r io.Reader) (*warnings, error) {
 		}
 	}
 	return &warnings{
-		byLine:  ws,
-		matched: make(map[*string]struct{}),
+		byLine: ws,
 	}, nil
 }
 
@@ -53,10 +51,10 @@ func (ws *warnings) find(line int, text string) *string {
 	return nil
 }
 
-func (ws *warnings) checkUnmatched(t *testing.T, testFilename string) {
-	for line, sl := range ws.byLine {
+func checkUnmatched(byLine map[int][]string, matched map[*string]struct{}, t *testing.T, testFilename string) {
+	for line, sl := range byLine {
 		for i, w := range sl {
-			if _, ok := ws.matched[&sl[i]]; !ok {
+			if _, ok := matched[&sl[i]]; !ok {
 				t.Errorf("%s:%d: unmatched `%s`", testFilename, line, w)
 			}
 		}

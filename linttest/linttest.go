@@ -114,22 +114,23 @@ func checkFiles(t *testing.T, c *lintpack.Checker, ctx *lintpack.Context, pkg *p
 		stripDirectives(f)
 		ctx.SetFileInfo(filename, f)
 
+		matched := make(map[*string]struct{})
 		for _, warn := range c.Check(f) {
 			line := ctx.FileSet.Position(warn.Node.Pos()).Line
 
 			if w := ws.find(line, warn.Text); w != nil {
-				if _, seen := ws.matched[w]; seen {
+				if _, seen := matched[w]; seen {
 					t.Errorf("%s:%d: multiple matches for %s",
 						testFilename, line, *w)
 				}
-				ws.matched[w] = struct{}{}
+				matched[w] = struct{}{}
 			} else {
 				t.Errorf("%s:%d: unexpected warn: %s",
 					testFilename, line, warn.Text)
 			}
 		}
 
-		ws.checkUnmatched(t, testFilename)
+		checkUnmatched(ws.byLine, matched, t, testFilename)
 	}
 }
 
