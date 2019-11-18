@@ -15,12 +15,12 @@ var (
 )
 
 type warnings struct {
-	byLine map[int][]*warning
+	byLine  map[int][]*warning
+	matched map[*warning]struct{}
 }
 
 type warning struct {
-	matched bool
-	text    string
+	text string
 }
 
 func (w warning) String() string {
@@ -46,7 +46,10 @@ func newWarnings(r io.Reader) (*warnings, error) {
 			pending = nil
 		}
 	}
-	return &warnings{byLine: ws}, nil
+	return &warnings{
+		byLine:  ws,
+		matched: make(map[*warning]struct{}),
+	}, nil
 }
 
 func (ws *warnings) find(line int, text string) *warning {
@@ -61,7 +64,7 @@ func (ws *warnings) find(line int, text string) *warning {
 func (ws *warnings) checkUnmatched(t *testing.T, testFilename string) {
 	for line, sl := range ws.byLine {
 		for _, w := range sl {
-			if !w.matched {
+			if _, ok := ws.matched[w]; !ok {
 				t.Errorf("%s:%d: unmatched `%s`", testFilename, line, w)
 			}
 		}

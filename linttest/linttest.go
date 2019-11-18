@@ -118,11 +118,11 @@ func checkFiles(t *testing.T, c *lintpack.Checker, ctx *lintpack.Context, pkg *p
 			line := ctx.FileSet.Position(warn.Node.Pos()).Line
 
 			if w := ws.find(line, warn.Text); w != nil {
-				if w.matched {
+				if _, seen := ws.matched[w]; seen {
 					t.Errorf("%s:%d: multiple matches for %s",
 						testFilename, line, w)
 				}
-				w.matched = true
+				ws.matched[w] = struct{}{}
 			} else {
 				t.Errorf("%s:%d: unexpected warn: %s",
 					testFilename, line, warn.Text)
