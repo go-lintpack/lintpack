@@ -57,8 +57,8 @@ func (ws *warnings) find(line int, text string) *warning {
 }
 
 func (ws *warnings) checkUnmatched(t *testing.T, testFilename string) {
-	for line := range ws.byLine {
-		for _, w := range ws.byLine[line] {
+	for line, sl := range ws.byLine {
+		for _, w := range sl {
 			if w.matched {
 				continue
 			}
