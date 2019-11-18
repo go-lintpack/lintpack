@@ -97,7 +97,7 @@ func checkFiles(t *testing.T, c *lintpack.Checker, ctx *lintpack.Context, pkg *p
 		filename := getFilename(ctx.FileSet, f)
 		testFilename := filepath.Join("testdata", c.Info.Name, filename)
 
-		var ws *warnings
+		var ws warnings
 		func() {
 			rc, err := os.Open(testFilename)
 			if err != nil {
@@ -130,7 +130,7 @@ func checkFiles(t *testing.T, c *lintpack.Checker, ctx *lintpack.Context, pkg *p
 			}
 		}
 
-		checkUnmatched(ws.byLine, matched, t, testFilename)
+		checkUnmatched(ws, matched, t, testFilename)
 	}
 }
 
@@ -152,8 +152,8 @@ func getFilename(fset *token.FileSet, f *ast.File) string {
 	return filepath.Base(fset.Position(f.Pos()).Filename)
 }
 
-func checkUnmatched(byLine map[int][]string, matched map[*string]struct{}, t *testing.T, testFilename string) {
-	for line, sl := range byLine {
+func checkUnmatched(ws warnings, matched map[*string]struct{}, t *testing.T, testFilename string) {
+	for line, sl := range ws {
 		for i, w := range sl {
 			if _, ok := matched[&sl[i]]; !ok {
 				t.Errorf("%s:%d: unmatched `%s`", testFilename, line, w)

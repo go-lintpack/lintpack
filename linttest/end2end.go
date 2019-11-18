@@ -13,20 +13,17 @@ var (
 	commentRE          = regexp.MustCompile(`^\s*//`)
 )
 
-type warnings struct {
-	byLine map[int][]string
-}
+type warnings map[int][]string
 
-func newWarnings(r io.Reader) (*warnings, error) {
+func newWarnings(r io.Reader) (warnings, error) {
 	b, err := ioutil.ReadAll(r)
 	if err != nil {
 		return nil, fmt.Errorf("read test file data: %w", err)
 	}
 	lines := strings.Split(string(b), "\n")
 
-	ws := make(map[int][]string)
+	ws := make(warnings)
 	var pending []string
-
 	for i, l := range lines {
 		if m := warningDirectiveRE.FindStringSubmatch(l); m != nil {
 			pending = append(pending, m[1])
@@ -36,13 +33,12 @@ func newWarnings(r io.Reader) (*warnings, error) {
 			pending = nil
 		}
 	}
-	return &warnings{
-		byLine: ws,
-	}, nil
+
+	return ws, nil
 }
 
-func (ws *warnings) find(line int, text string) *string {
-	for _, w := range ws.byLine[line] {
+func (ws warnings) find(line int, text string) *string {
+	for _, w := range ws[line] {
 		if text == w {
 			return &w
 		}
