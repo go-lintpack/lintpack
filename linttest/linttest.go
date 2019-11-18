@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"os"
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
@@ -95,7 +96,20 @@ func checkFiles(t *testing.T, c *lintpack.Checker, ctx *lintpack.Context, pkg *p
 	for _, f := range pkg.Syntax {
 		filename := getFilename(ctx.FileSet, f)
 		testFilename := filepath.Join("testdata", c.Info.Name, filename)
-		ws := newWarnings(t, testFilename)
+
+		var ws *warnings
+		func() {
+			rc, err := os.Open(testFilename)
+			if err != nil {
+				t.Fatalf("read file %q: %w", testFilename, err)
+			}
+			defer rc.Close()
+
+			ws, err = newWarnings(rc)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}()
 
 		stripDirectives(f)
 		ctx.SetFileInfo(filename, f)

@@ -1,6 +1,8 @@
 package linttest
 
 import (
+	"fmt"
+	"io"
 	"io/ioutil"
 	"regexp"
 	"strings"
@@ -25,12 +27,12 @@ func (w warning) String() string {
 	return w.text
 }
 
-func newWarnings(t *testing.T, filename string) *warnings {
-	testData, err := ioutil.ReadFile(filename)
+func newWarnings(r io.Reader) (*warnings, error) {
+	b, err := ioutil.ReadAll(r)
 	if err != nil {
-		t.Fatalf("can't find checker tests: %v", err)
+		return nil, fmt.Errorf("read test file data: %w", err)
 	}
-	lines := strings.Split(string(testData), "\n")
+	lines := strings.Split(string(b), "\n")
 
 	ws := make(map[int][]*warning)
 	var pending []*warning
@@ -44,7 +46,7 @@ func newWarnings(t *testing.T, filename string) *warnings {
 			pending = pending[:0]
 		}
 	}
-	return &warnings{byLine: ws}
+	return &warnings{byLine: ws}, nil
 }
 
 func (ws *warnings) find(line int, text string) *warning {
