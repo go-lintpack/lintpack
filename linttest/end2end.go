@@ -48,9 +48,9 @@ func newWarnings(t *testing.T, filename string) *warnings {
 }
 
 func (ws *warnings) find(line int, text string) *warning {
-	for _, y := range ws.byLine[line] {
-		if text == y.text {
-			return y
+	for _, w := range ws.byLine[line] {
+		if text == w.text {
+			return w
 		}
 	}
 	return nil
