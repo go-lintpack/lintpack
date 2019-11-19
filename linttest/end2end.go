@@ -38,9 +38,9 @@ func newWarnings(r io.Reader) (warnings, error) {
 }
 
 func (ws warnings) find(line int, text string) *string {
-	for _, w := range ws[line] {
-		if text == w {
-			return &w
+	for i := range ws[line] {
+		if text == ws[line][i] {
+			return &ws[line][i]
 		}
 	}
 	return nil
