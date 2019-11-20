@@ -86,52 +86,49 @@ func TestCheckers(t *testing.T) {
 					Pkg:       pkg.Types,
 				}
 				c := lintpack.NewChecker(ctx, info)
-				checkFiles(t, c, ctx, pkg)
+				for _, f := range pkg.Syntax {
+					checkFile(t, c, ctx, f)
+				}
 			}
 		})
 	}
 }
 
-func checkFiles(t *testing.T, c *lintpack.Checker, ctx *lintpack.Context, pkg *packages.Package) {
-	for _, f := range pkg.Syntax {
-		filename := getFilename(ctx.FileSet, f)
-		testFilename := filepath.Join("testdata", c.Info.Name, filename)
+func checkFile(t *testing.T, c *lintpack.Checker, ctx *lintpack.Context, f *ast.File) {
+	filename := getFilename(ctx.FileSet, f)
+	testFilename := filepath.Join("testdata", c.Info.Name, filename)
 
-		var ws warnings
-		func() {
-			rc, err := os.Open(testFilename)
-			if err != nil {
-				t.Fatalf("read file %q: %w", testFilename, err)
-			}
-			defer rc.Close()
-
-			ws, err = newWarnings(rc)
-			if err != nil {
-				t.Fatal(err)
-			}
-		}()
-
-		stripDirectives(f)
-		ctx.SetFileInfo(filename, f)
-
-		matched := make(map[*string]struct{})
-		for _, warn := range c.Check(f) {
-			line := ctx.FileSet.Position(warn.Node.Pos()).Line
-
-			if w := ws.find(line, warn.Text); w != nil {
-				if _, seen := matched[w]; seen {
-					t.Errorf("%s:%d: multiple matches for %s",
-						testFilename, line, *w)
-				}
-				matched[w] = struct{}{}
-			} else {
-				t.Errorf("%s:%d: unexpected warn: %s",
-					testFilename, line, warn.Text)
-			}
-		}
-
-		checkUnmatched(ws, matched, t, testFilename)
+	rc, err := os.Open(testFilename)
+	if err != nil {
+		t.Fatalf("read file %q: %w", testFilename, err)
 	}
+	defer rc.Close()
+
+	ws, err := newWarnings(rc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stripDirectives(f)
+	ctx.SetFileInfo(filename, f)
+
+	matched := make(map[*string]struct{})
+	for _, warn := range c.Check(f) {
+		line := ctx.FileSet.Position(warn.Node.Pos()).Line
+
+		if w := ws.find(line, warn.Text); w != nil {
+			if _, seen := matched[w]; seen {
+				t.Errorf("%s:%d: multiple matches for %s",
+					testFilename, line, *w)
+			}
+			matched[w] = struct{}{}
+		} else {
+			t.Errorf("%s:%d: unexpected warn: %s",
+				testFilename, line, warn.Text)
+		}
+	}
+
+	checkUnmatched(ws, matched, t, testFilename)
 }
 
 // stripDirectives replaces "///" comments with empty single-line
