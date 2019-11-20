@@ -1,11 +1,10 @@
 package linttest
 
 import (
+	"bufio"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"regexp"
-	"strings"
 )
 
 var (
@@ -16,22 +15,22 @@ var (
 type warnings map[int][]string
 
 func newWarnings(r io.Reader) (warnings, error) {
-	b, err := ioutil.ReadAll(r)
-	if err != nil {
-		return nil, fmt.Errorf("read test file data: %w", err)
-	}
-	lines := strings.Split(string(b), "\n")
-
 	ws := make(warnings)
 	var pending []string
-	for i, l := range lines {
-		if m := warningDirectiveRE.FindStringSubmatch(l); m != nil {
+
+	s := bufio.NewScanner(r)
+	for i := 0; s.Scan(); i++ {
+		if m := warningDirectiveRE.FindStringSubmatch(s.Text()); m != nil {
 			pending = append(pending, m[1])
 		} else if len(pending) != 0 {
 			line := i + 1
 			ws[line] = pending
 			pending = nil
 		}
+	}
+
+	if err := s.Err(); err != nil {
+		return nil, fmt.Errorf("read test file data: %w", err)
 	}
 
 	return ws, nil
