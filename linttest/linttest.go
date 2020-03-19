@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"os"
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
@@ -85,38 +86,49 @@ func TestCheckers(t *testing.T) {
 					Pkg:       pkg.Types,
 				}
 				c := lintpack.NewChecker(ctx, info)
-				checkFiles(t, c, ctx, pkg)
+				for _, f := range pkg.Syntax {
+					checkFile(t, c, ctx, f)
+				}
 			}
 		})
 	}
 }
 
-func checkFiles(t *testing.T, c *lintpack.Checker, ctx *lintpack.Context, pkg *packages.Package) {
-	for _, f := range pkg.Syntax {
-		filename := getFilename(ctx.FileSet, f)
-		testFilename := filepath.Join("testdata", c.Info.Name, filename)
-		ws := newWarnings(t, testFilename)
+func checkFile(t *testing.T, c *lintpack.Checker, ctx *lintpack.Context, f *ast.File) {
+	filename := getFilename(ctx.FileSet, f)
+	testFilename := filepath.Join("testdata", c.Info.Name, filename)
 
-		stripDirectives(f)
-		ctx.SetFileInfo(filename, f)
-
-		for _, warn := range c.Check(f) {
-			line := ctx.FileSet.Position(warn.Node.Pos()).Line
-
-			if w := ws.find(line, warn.Text); w != nil {
-				if w.matched {
-					t.Errorf("%s:%d: multiple matches for %s",
-						testFilename, line, w)
-				}
-				w.matched = true
-			} else {
-				t.Errorf("%s:%d: unexpected warn: %s",
-					testFilename, line, warn.Text)
-			}
-		}
-
-		ws.checkUnmatched(t, testFilename)
+	rc, err := os.Open(testFilename)
+	if err != nil {
+		t.Fatalf("read file %q: %w", testFilename, err)
 	}
+	defer rc.Close()
+
+	ws, err := newWarnings(rc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stripDirectives(f)
+	ctx.SetFileInfo(filename, f)
+
+	matched := make(map[*string]struct{})
+	for _, warn := range c.Check(f) {
+		line := ctx.FileSet.Position(warn.Node.Pos()).Line
+
+		if w := ws.find(line, warn.Text); w != nil {
+			if _, seen := matched[w]; seen {
+				t.Errorf("%s:%d: multiple matches for %s",
+					testFilename, line, *w)
+			}
+			matched[w] = struct{}{}
+		} else {
+			t.Errorf("%s:%d: unexpected warn: %s",
+				testFilename, line, warn.Text)
+		}
+	}
+
+	checkUnmatched(ws, matched, t, testFilename)
 }
 
 // stripDirectives replaces "///" comments with empty single-line
@@ -135,6 +147,16 @@ func stripDirectives(f *ast.File) {
 func getFilename(fset *token.FileSet, f *ast.File) string {
 	// see https://github.com/golang/go/issues/24498
 	return filepath.Base(fset.Position(f.Pos()).Filename)
+}
+
+func checkUnmatched(ws warnings, matched map[*string]struct{}, t *testing.T, testFilename string) {
+	for line, sl := range ws {
+		for i, w := range sl {
+			if _, ok := matched[&sl[i]]; !ok {
+				t.Errorf("%s:%d: unmatched `%s`", testFilename, line, w)
+			}
+		}
+	}
 }
 
 func newPackages(t *testing.T, pattern string, fset *token.FileSet) []*packages.Package {
